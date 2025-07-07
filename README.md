@@ -1,6 +1,6 @@
-# Accessibility Analyzer
+# WebForAll-Web-accessibility-for-everyone
 
-A web application that analyzes HTML content for accessibility issues and provides recommendations for improvement.
+A web application that analyzes websites for accessibility issues and provides recommendations for improvement.
 
 ## Running the Application
 
