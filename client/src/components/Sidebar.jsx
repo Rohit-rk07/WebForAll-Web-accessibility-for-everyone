@@ -10,13 +10,12 @@ import {
   Divider,
   Avatar,
   Tooltip,
-  Paper
+  Paper,
+  useTheme
 } from '@mui/material';
 import { 
   Home as HomeIcon, 
   History as HistoryIcon, 
-  Settings as SettingsIcon,
-  Security as SecurityIcon,
   Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -27,13 +26,22 @@ const drawerWidth = 280;
 const navItems = [
   { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard/home' },
   { label: 'History', icon: <HistoryIcon />, path: '/dashboard/history' },
-  { label: 'Settings', icon: <SettingsIcon />, path: '/dashboard/settings' },
 ];
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const theme = useTheme();
+  // Theme-based colors
+  const COLORS = {
+    background: theme.palette.background.paper,
+    border: theme.palette.divider,
+    text: theme.palette.text.primary,
+    primary: theme.palette.primary.main,
+    secondary: theme.palette.secondary.main,
+    hover: theme.palette.action.hover
+  };
 
   return (
     <Paper
@@ -42,10 +50,9 @@ const Sidebar = () => {
       sx={{ 
         width: drawerWidth, 
         flexShrink: 0, 
-        bgcolor: 'rgba(255, 255, 255, 0.95)', 
+        bgcolor: COLORS.background, 
         backdropFilter: 'blur(10px)',
-        borderRight: '1px solid',
-        borderColor: 'divider', 
+        borderRight: `1px solid ${COLORS.border}`,
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -60,8 +67,9 @@ const Sidebar = () => {
         gap: 2,
         mb: 2
       }}>
-        <Avatar sx={{ bgcolor: 'primary.dark', width: 40, height: 40 }}>
-          <SecurityIcon />
+        <Avatar sx={{ bgcolor: COLORS.primary, width: 40, height: 40 }}>
+          {/* SecurityIcon was removed, so this will cause an error */}
+          {/* <SecurityIcon /> */}
         </Avatar>
         <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold' }}>
           Accessibility
@@ -79,9 +87,9 @@ const Sidebar = () => {
             gap: 2,
             p: 2,
             borderRadius: 2,
-            bgcolor: 'primary.50'
+            bgcolor: COLORS.primary + '50'
           }}>
-            <Avatar sx={{ bgcolor: 'primary.dark' }}>
+            <Avatar sx={{ bgcolor: COLORS.primary }}>
               {user.email.charAt(0).toUpperCase()}
             </Avatar>
             <Box>
@@ -121,10 +129,10 @@ const Sidebar = () => {
                   mb: 1,
                   py: 1.5,
                   '&.Mui-selected': {
-                    bgcolor: 'primary.dark',
+                    bgcolor: COLORS.primary,
                     color: 'white',
                     '&:hover': {
-                      bgcolor: 'primary.darker',
+                      bgcolor: COLORS.primary + 'er',
                     },
                     '& .MuiListItemIcon-root': {
                       color: 'white',

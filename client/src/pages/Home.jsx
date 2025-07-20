@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import UploadCard from '../components/UploadCard';
 import ResultCard from '../components/ResultCard';
-import { Box, Typography, Paper, CircularProgress, Alert, AlertTitle, Container } from '@mui/material';
+import { Box, Typography, Paper, CircularProgress, Alert, AlertTitle, Container, useTheme } from '@mui/material';
+
+// API base URL from environment or default to localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 /**
  * Home page component
@@ -14,34 +17,28 @@ const Home = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const theme = useTheme();
 
   /**
-   * Sends HTML to the backend for accessibility analysis
-   * @param {string} html - The HTML code to analyze
+   * Handles analysis results from any source
+   * @param {Object} data - The analysis result data
    */
-  const analyzeHTML = async (html) => {
-    setLoading(true);
-    setError(null);
+  const handleAnalysisResult = (data) => {
+    // Ensure the result has a consistent structure
+    const formattedResult = {
+      ...data,
+      results: data.results || {},
+      mode: data.mode || 'static_only'
+    };
     
-    try {
-      const res = await fetch('http://localhost:8000/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html }),
-      });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
-      console.error('Analysis error:', err);
-    } finally {
-      setLoading(false);
-    }
+    setResult(formattedResult);
+  };
+
+  /**
+   * Clears any error messages
+   */
+  const clearError = () => {
+    setError(null);
   };
 
   return (
@@ -51,6 +48,7 @@ const Home = () => {
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
+        bgcolor: theme.palette.background.default,
       }}
     >
       <Navbar />
@@ -64,7 +62,7 @@ const Home = () => {
           alignItems: 'center',
           textAlign: 'center',
           px: 3,
-          width: '100%'
+          width: '100%',
         }}
       >
         <Typography 
@@ -73,7 +71,7 @@ const Home = () => {
           sx={{ 
             fontWeight: 700, 
             mb: 2,
-            color: 'text.primary',
+            color: theme.palette.text.primary,
           }}
         >
           Accessibility Analyzer
@@ -82,27 +80,139 @@ const Home = () => {
           variant="h6" 
           sx={{ 
             maxWidth: 800, 
-            mb: 5,
+            mb: 3,
             fontWeight: 400,
-            color: 'text.secondary'
+            color: theme.palette.text.secondary,
           }}
         >
           Analyze your HTML code for accessibility issues and get recommendations to improve inclusivity
         </Typography>
+        
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          justifyContent: 'center', 
+          gap: 3, 
+          maxWidth: 900,
+          mb: 5
+        }}>
+          <Paper 
+            elevation={1} 
+            sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: 'rgba(67, 97, 238, 0.05)',
+              border: '1px solid rgba(67, 97, 238, 0.1)',
+              flex: '1 1 250px',
+              maxWidth: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center'
+            }}
+          >
+            <Box 
+              component="img" 
+              src="/ai-explain.svg" 
+              alt="" 
+              sx={{ height: 60, mb: 1, opacity: 0.9 }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+              AI Explanations
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Get AI-powered explanations for accessibility issues with step-by-step fixes and code examples
+            </Typography>
+          </Paper>
+          
+          <Paper 
+            elevation={1} 
+            sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: 'rgba(67, 97, 238, 0.05)',
+              border: '1px solid rgba(67, 97, 238, 0.1)',
+              flex: '1 1 250px',
+              maxWidth: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center'
+            }}
+          >
+            <Box 
+              component="img" 
+              src="/ai-chat.svg" 
+              alt="" 
+              sx={{ height: 60, mb: 1, opacity: 0.9 }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+              AI Assistant
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Chat with our AI assistant to learn about accessibility best practices and WCAG guidelines
+            </Typography>
+          </Paper>
+          
+          <Paper 
+            elevation={1} 
+            sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: 'rgba(67, 97, 238, 0.05)',
+              border: '1px solid rgba(67, 97, 238, 0.1)',
+              flex: '1 1 250px',
+              maxWidth: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center'
+            }}
+          >
+            <Box 
+              component="img" 
+              src="/ai-summary.svg" 
+              alt="" 
+              sx={{ height: 60, mb: 1, opacity: 0.9 }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+              AI Summary Reports
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Generate comprehensive accessibility reports with prioritized recommendations and impact analysis
+            </Typography>
+          </Paper>
+        </Box>
       </Box>
 
       {/* Main Content */}
       <Container maxWidth="xl" sx={{ flex: 1, mb: 6 }}>
         {/* Upload/Paste Component - Default to URL tab (index 0) */}
-        <UploadCard onAnalyze={analyzeHTML} defaultTab={0} />
+        <UploadCard 
+          onAnalyze={handleAnalysisResult} 
+          defaultTab={0} 
+          isLoading={loading}
+          setIsLoading={setLoading}
+          onError={setError}
+          clearError={clearError}
+        />
         
         {/* Loading State */}
         {loading && (
-          <Paper elevation={3} sx={{ width: '100%', mt: 3, borderRadius: 3, p: 4, bgcolor: 'background.paper' }}>
+          <Paper elevation={3} sx={{ width: '100%', mt: 3, borderRadius: 3, p: 4, bgcolor: theme.palette.background.paper }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, py: 6 }}>
               <CircularProgress />
-              <Typography variant="body1" color="text.secondary">
-                Analyzing your HTML code...
+              <Typography variant="body1" color={theme.palette.text.secondary}>
+                Analyzing your content...
               </Typography>
             </Box>
           </Paper>

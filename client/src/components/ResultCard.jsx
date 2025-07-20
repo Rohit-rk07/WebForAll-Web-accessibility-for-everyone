@@ -11,7 +11,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  useTheme
 } from '@mui/material';
 import { 
   ExpandMore, 
@@ -21,27 +22,6 @@ import {
   InfoOutlined,
   AccessibilityNew
 } from '@mui/icons-material';
-
-// Color scheme to match dashboard
-const COLORS = {
-  background: '#ffffff',
-  border: '#e0e0e0',
-  text: '#333333',
-  lightText: '#666666',
-  primary: '#4361ee',
-  secondary: '#3a0ca3',
-  codeBackground: '#f5f7fa'
-};
-
-/**
- * Severity level to icon/color mapping
- */
-const severityMap = {
-  error: { icon: <ErrorOutline sx={{ color: '#d32f2f' }} />, color: 'error' },
-  warning: { icon: <WarningAmber sx={{ color: '#ed6c02' }} />, color: 'warning' },
-  info: { icon: <InfoOutlined sx={{ color: COLORS.primary }} />, color: 'info' },
-  success: { icon: <CheckCircleOutline sx={{ color: '#2e7d32' }} />, color: 'success' }
-};
 
 /**
  * ResultCard component
@@ -54,14 +34,64 @@ const severityMap = {
 const ResultCard = ({ result }) => {
   // If no results, don't render anything
   if (!result) return null;
+  
+  // Get theme for color values
+  const theme = useTheme();
+  
+  // Theme-based colors
+  const COLORS = {
+    background: theme.palette.background.paper,
+    border: theme.palette.divider,
+    text: theme.palette.text.primary,
+    lightText: theme.palette.text.secondary,
+    primary: theme.palette.primary.main,
+    secondary: theme.palette.secondary.main,
+    codeBackground: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : theme.palette.grey[50]
+  };
+  
+  // Debug output to console
+  console.log('Analysis result:', result);
+
+  // Extract violations from results (handle different API response structures)
+  let violations = [];
+  if (result.results && result.results.violations) {
+    violations = result.results.violations;
+  } else if (result.violations) {
+    violations = result.violations;
+  }
+  
+  // Ensure violations is always an array
+  if (!Array.isArray(violations)) {
+    violations = [];
+  }
+  
+  const mode = result.mode || 'unknown';
 
   /**
-   * Gets the appropriate icon and color based on issue severity
+   * Severity level to icon/color mapping using theme colors
+   */
+  const severityMap = {
+    error: { icon: <ErrorOutline sx={{ color: theme.palette.error.main }} />, color: 'error' },
+    warning: { icon: <WarningAmber sx={{ color: theme.palette.warning.main }} />, color: 'warning' },
+    info: { icon: <InfoOutlined sx={{ color: theme.palette.info.main }} />, color: 'info' },
+    notice: { icon: <InfoOutlined sx={{ color: theme.palette.info.main }} />, color: 'info' },
+    success: { icon: <CheckCircleOutline sx={{ color: theme.palette.success.main }} />, color: 'success' },
+    critical: { icon: <ErrorOutline sx={{ color: theme.palette.error.main }} />, color: 'error' },
+    serious: { icon: <WarningAmber sx={{ color: theme.palette.warning.main }} />, color: 'warning' },
+    moderate: { icon: <InfoOutlined sx={{ color: theme.palette.info.main }} />, color: 'info' },
+    minor: { icon: <InfoOutlined sx={{ color: theme.palette.info.main }} />, color: 'info' }
+  };
+
+  /**
+   * Gets the appropriate icon and color based on issue severity or impact
    * @param {string} severity - The severity level
+   * @param {string} impact - The impact level (fallback)
    * @returns {Object} Object containing icon and color
    */
-  const getSeverityProps = (severity) => {
-    return severityMap[severity.toLowerCase()] || severityMap.info;
+  const getSeverityProps = (severity, impact) => {
+    return severityMap[severity?.toLowerCase()] || 
+           severityMap[impact?.toLowerCase()] || 
+           severityMap.info;
   };
 
   /**
@@ -69,38 +99,46 @@ const ResultCard = ({ result }) => {
    * @returns {JSX.Element} Summary statistics component
    */
   const renderSummary = () => {
-    const { errors = 0, warnings = 0, notices = 0, passed = 0 } = result.summary || {};
+    // Count issues by severity/impact
+    const summary = violations.reduce((acc, issue) => {
+      const severity = issue.severity || issue.impact || 'info';
+      const severityKey = severity.toLowerCase();
+      
+      if (severityKey.includes('error') || severityKey.includes('critical')) {
+        acc.errors += 1;
+      } else if (severityKey.includes('warn') || severityKey.includes('serious')) {
+        acc.warnings += 1;
+      } else {
+        acc.notices += 1;
+      }
+      return acc;
+    }, { errors: 0, warnings: 0, notices: 0 });
     
     return (
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
         <Chip 
           icon={<ErrorOutline />} 
-          label={`${errors} Errors`} 
+          label={`${summary.errors} Errors`} 
           color="error" 
-          variant={errors > 0 ? "filled" : "outlined"} 
+          variant={summary.errors > 0 ? "filled" : "outlined"} 
         />
         <Chip 
           icon={<WarningAmber />} 
-          label={`${warnings} Warnings`} 
+          label={`${summary.warnings} Warnings`} 
           color="warning" 
-          variant={warnings > 0 ? "filled" : "outlined"} 
+          variant={summary.warnings > 0 ? "filled" : "outlined"} 
         />
         <Chip 
           icon={<InfoOutlined />} 
-          label={`${notices} Notices`} 
+          label={`${summary.notices} Notices`} 
           color="info" 
-          variant={notices > 0 ? "filled" : "outlined"} 
-          sx={{ 
-            '&.MuiChip-filledInfo': { 
-              bgcolor: COLORS.primary 
-            }
-          }}
+          variant={summary.notices > 0 ? "filled" : "outlined"} 
         />
         <Chip 
-          icon={<CheckCircleOutline />} 
-          label={`${passed} Passed`} 
-          color="success" 
-          variant={passed > 0 ? "filled" : "outlined"} 
+          icon={<AccessibilityNew />} 
+          label={`Analysis Mode: ${mode}`} 
+          color="default" 
+          variant="outlined" 
         />
       </Box>
     );
@@ -111,11 +149,19 @@ const ResultCard = ({ result }) => {
    * @returns {JSX.Element} Issues component
    */
   const renderIssues = () => {
-    const { issues = [] } = result;
+    if (violations.length === 0) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 3 }}>
+          <Typography variant="body1" color={COLORS.lightText}>
+            No issues found.
+          </Typography>
+        </Box>
+      );
+    }
     
-    // Group issues by category
-    const groupedIssues = issues.reduce((acc, issue) => {
-      const category = issue.category || 'Other';
+    // Group issues by category/id
+    const groupedIssues = violations.reduce((acc, issue) => {
+      const category = issue.category || issue.id || issue.type || 'Other';
       if (!acc[category]) acc[category] = [];
       acc[category].push(issue);
       return acc;
@@ -152,7 +198,8 @@ const ResultCard = ({ result }) => {
             <AccordionDetails sx={{ px: 2 }}>
               <List disablePadding>
                 {categoryIssues.map((issue, index) => {
-                  const { icon, color } = getSeverityProps(issue.severity || 'info');
+                  const { icon, color } = getSeverityProps(issue.severity, issue.impact);
+                  const nodes = issue.nodes || [];
                   
                   return (
                     <React.Fragment key={index}>
@@ -164,52 +211,136 @@ const ResultCard = ({ result }) => {
                         <ListItemText
                           primary={
                             <Typography variant="subtitle2" fontWeight="medium" color={COLORS.text}>
-                              {issue.title || 'Issue'}
+                              {issue.title || issue.help || issue.description || 'Accessibility Issue'}
                             </Typography>
                           }
                           secondary={
-                            <Box sx={{ mt: 1 }}>
-                              <Typography variant="body2" component="div" sx={{ mb: 1, color: COLORS.lightText }}>
-                                {issue.description || 'No description provided'}
-                              </Typography>
-                              
-                              {issue.element && (
-                                <Box 
-                                  sx={{ 
-                                    bgcolor: COLORS.codeBackground, 
-                                    p: 1.5, 
-                                    borderRadius: 1,
-                                    overflowX: 'auto',
-                                    my: 1,
-                                    border: `1px solid ${COLORS.border}`
-                                  }}
-                                >
-                                  <Typography 
-                                    variant="body2" 
-                                    component="pre" 
+                            <Typography component="div" variant="body2">
+                              <Box sx={{ mt: 1 }}>
+                                <Typography variant="body2" component="div" sx={{ mb: 1, color: COLORS.lightText }}>
+                                  {issue.description || issue.help || 'No description provided'}
+                                </Typography>
+                                
+                                {/* Show nodes if available */}
+                                {nodes.length > 0 && nodes.map((node, nodeIndex) => (
+                                  <Box key={nodeIndex} sx={{ mb: 2 }}>
+                                    {node.html && (
+                                      <Box 
+                                        sx={{ 
+                                          bgcolor: COLORS.codeBackground, 
+                                          p: 1.5, 
+                                          borderRadius: 1,
+                                          overflowX: 'auto',
+                                          my: 1,
+                                          border: `1px solid ${COLORS.border}`
+                                        }}
+                                      >
+                                        <Typography 
+                                          variant="body2" 
+                                          component="code" 
+                                          sx={{ 
+                                            fontFamily: 'monospace', 
+                                            m: 0,
+                                            fontSize: '0.85rem',
+                                            color: COLORS.text,
+                                            display: 'block'
+                                          }}
+                                        >
+                                          {node.html}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    
+                                    {node.failureSummary && (
+                                      <Typography variant="body2" color={COLORS.lightText}>
+                                        {node.failureSummary}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                ))}
+                                
+                                {/* Show element if available */}
+                                {issue.element && !nodes.length && (
+                                  <Box 
                                     sx={{ 
-                                      fontFamily: 'monospace', 
-                                      m: 0,
-                                      fontSize: '0.85rem',
-                                      color: COLORS.text
+                                      bgcolor: COLORS.codeBackground, 
+                                      p: 1.5, 
+                                      borderRadius: 1,
+                                      overflowX: 'auto',
+                                      my: 1,
+                                      border: `1px solid ${COLORS.border}`
                                     }}
                                   >
-                                    {issue.element}
-                                  </Typography>
-                                </Box>
-                              )}
-                              
-                              {issue.recommendation && (
-                                <Box sx={{ mt: 1 }}>
-                                  <Typography variant="body2" fontWeight="medium" color={COLORS.text}>
-                                    Recommendation:
-                                  </Typography>
-                                  <Typography variant="body2" color={COLORS.lightText}>
-                                    {issue.recommendation}
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
+                                    <Typography 
+                                      variant="body2" 
+                                      component="code" 
+                                      sx={{ 
+                                        fontFamily: 'monospace', 
+                                        m: 0,
+                                        fontSize: '0.85rem',
+                                        color: COLORS.text,
+                                        display: 'block'
+                                      }}
+                                    >
+                                      {issue.element}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                
+                                {/* Show recommendation if available */}
+                                {(issue.recommendation || issue.fix_suggestion || issue.help) && (
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" component="div" fontWeight="medium" color={COLORS.text}>
+                                      Recommendation:
+                                    </Typography>
+                                    <Typography variant="body2" component="div" color={COLORS.lightText}>
+                                      {issue.recommendation || issue.fix_suggestion || issue.help}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                
+                                {/* Show WCAG criteria if available */}
+                                {issue.wcag_criteria && issue.wcag_criteria.length > 0 && (
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" component="div" fontWeight="medium" color={COLORS.text}>
+                                      WCAG Criteria:
+                                    </Typography>
+                                    {issue.wcag_criteria.map((criterion, i) => (
+                                      <Typography key={i} variant="body2" component="div" color={COLORS.lightText}>
+                                        {criterion.id} - {criterion.description} (Level {criterion.level})
+                                      </Typography>
+                                    ))}
+                                  </Box>
+                                )}
+                                
+                                {/* Show tags if available */}
+                                {issue.tags && issue.tags.length > 0 && (
+                                  <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                    {issue.tags.map((tag, i) => (
+                                      <Chip 
+                                        key={i} 
+                                        label={tag} 
+                                        size="small" 
+                                        variant="outlined" 
+                                        sx={{ fontSize: '0.7rem' }}
+                                      />
+                                    ))}
+                                  </Box>
+                                )}
+                                
+                                {/* Show impact if available */}
+                                {issue.impact && (
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" component="div" fontWeight="medium" color={COLORS.text}>
+                                      Impact:
+                                    </Typography>
+                                    <Typography variant="body2" component="div" color={COLORS.lightText}>
+                                      {issue.impact}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                            </Typography>
                           }
                         />
                       </ListItem>
@@ -231,34 +362,26 @@ const ResultCard = ({ result }) => {
         width: '100%', 
         mt: 3, 
         borderRadius: 2, 
-        p: 4,
+        p: 3, 
         bgcolor: COLORS.background,
         border: `1px solid ${COLORS.border}`
       }}
     >
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <AccessibilityNew sx={{ color: COLORS.primary }} fontSize="large" />
-        <Typography variant="h5" fontWeight="bold" color={COLORS.text}>
-          Accessibility Analysis Results
-        </Typography>
-      </Box>
-      
-      <Divider sx={{ mb: 3, borderColor: COLORS.border }} />
-      
-      {/* Summary */}
-      <Typography variant="h6" fontWeight="medium" sx={{ mb: 2 }} color={COLORS.text}>
-        Summary
+      <Typography variant="h5" fontWeight="bold" color={COLORS.text} gutterBottom>
+        Analysis Results
       </Typography>
+      
       {renderSummary()}
       
-      {/* Issues */}
-      <Typography variant="h6" fontWeight="medium" sx={{ mb: 2 }} color={COLORS.text}>
-        Issues
+      <Divider sx={{ my: 3, borderColor: COLORS.border }} />
+      
+      <Typography variant="h6" fontWeight="medium" color={COLORS.text} gutterBottom>
+        Accessibility Issues
       </Typography>
+      
       {renderIssues()}
     </Paper>
   );
 };
 
-export default ResultCard; 
+export default ResultCard;

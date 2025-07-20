@@ -8,24 +8,13 @@ import {
   ListItemButton, 
   ListItemIcon, 
   ListItemText, 
-  AppBar, 
-  Toolbar, 
-  IconButton, 
-  Typography, 
-  Avatar, 
-  Menu, 
-  MenuItem, 
   Divider,
   useMediaQuery,
   useTheme
 } from '@mui/material';
 import { 
-  Menu as MenuIcon, 
   Home as HomeIcon, 
   History as HistoryIcon, 
-  Settings as SettingsIcon, 
-  Logout as LogoutIcon,
-  AccountCircle,
   ChevronLeft
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,21 +24,10 @@ import Navbar from '../components/Navbar';
 const menuItems = [
   { text: 'Dashboard', icon: <HomeIcon />, path: '/dashboard/home' },
   { text: 'History', icon: <HistoryIcon />, path: '/dashboard/history' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/dashboard/settings' },
 ];
 
 // Drawer width for desktop view
 const DRAWER_WIDTH = 240;
-
-// Color scheme
-const COLORS = {
-  background: '#f5f7fa',
-  sidebar: '#ffffff',
-  activeItem: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
-  text: '#333333',
-  activeText: '#ffffff',
-  divider: '#e0e0e0'
-};
 
 /**
  * DashboardLayout component
@@ -61,7 +39,6 @@ const COLORS = {
 const DashboardLayout = () => {
   // State management
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
   
   // Hooks
   const theme = useTheme();
@@ -82,18 +59,14 @@ const DashboardLayout = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    handleMenuClose();
-    logout();
-    navigate('/login');
+  // Theme-based colors
+  const COLORS = {
+    background: theme.palette.background.default,
+    sidebar: theme.palette.background.paper,
+    activeItem: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+    text: theme.palette.text.primary,
+    activeText: theme.palette.getContrastText(theme.palette.primary.main),
+    divider: theme.palette.divider
   };
 
   /**
@@ -167,65 +140,64 @@ const DashboardLayout = () => {
       {/* Navbar */}
       <Navbar />
       
-      {/* Dashboard Content */}
-      <Box sx={{ display: 'flex', flex: 1, position: 'relative' }}>
-        {/* Sidebar - Mobile */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: DRAWER_WIDTH,
-              bgcolor: COLORS.sidebar,
-              color: COLORS.text,
-            },
-          }}
-        >
-          {drawerContent}
-        </Drawer>
-        
-        {/* Sidebar - Desktop */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', md: 'block' },
+      {/* Sidebar - Mobile */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
             width: DRAWER_WIDTH,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: DRAWER_WIDTH,
-              bgcolor: COLORS.sidebar,
-              color: COLORS.text,
-              borderRight: '1px solid',
-              borderColor: COLORS.divider,
-              position: 'relative'
-            },
-          }}
-          open
-        >
-          {drawerContent}
-        </Drawer>
-        
-        {/* Main Content */}
-        <Box 
-          component="main" 
-          sx={{ 
-            flexGrow: 1, 
-            p: 3,
-            width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-            background: COLORS.background,
-            overflow: 'auto',
-          }}
-        > 
-            <Outlet />
-          </Box>
-        </Box>
+            bgcolor: COLORS.sidebar,
+            color: COLORS.text,
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+      
+      {/* Sidebar - Desktop */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
+            width: DRAWER_WIDTH,
+            bgcolor: COLORS.sidebar,
+            color: COLORS.text,
+            borderRight: '1px solid',
+            borderColor: COLORS.divider,
+            position: 'fixed',
+            top: 64,
+            height: 'calc(100vh - 64px)',
+            overflow: 'auto'
+          },
+        }}
+        open
+      >
+        {drawerContent}
+      </Drawer>
+      
+      {/* Main Content */}
+      <Box 
+        component="main" 
+        sx={{ 
+          p: 3,
+          marginTop: '64px',
+          marginLeft: { xs: 0, md: `${DRAWER_WIDTH}px` },
+          background: COLORS.background,
+          minHeight: 'calc(100vh - 64px)',
+          overflow: 'auto',
+        }}
+      > 
+        <Outlet />
       </Box>
+    </Box>
   );
 };
 
-export default DashboardLayout; 
+export default DashboardLayout;

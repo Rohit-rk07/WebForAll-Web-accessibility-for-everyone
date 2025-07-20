@@ -9,10 +9,11 @@ import {
   IconButton,
   Paper,
   Avatar,
-  Stepper,
-  Step,
-  StepLabel,
-  Container
+  Container,
+  Alert,
+  CircularProgress,
+  useTheme,
+  alpha
 } from '@mui/material';
 import { 
   Visibility, 
@@ -27,30 +28,72 @@ import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Signup page component
- * Handles new user registration with a multi-step form
+ * Handles new user registration
  */
 const Signup = () => {
   // State management
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   
   // Hooks
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
+  const theme = useTheme();
 
   /**
    * Handles form submission
    * @param {Event} e - Form submit event
    */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) return; // rudimentary check
-    login({ email });
+    
+    // Clear previous errors
+    setError('');
+    
+    // Validate form
+    if (!fullName) {
+      setError("Full name is required");
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      setError("Passwords don't match");
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      console.log('Attempting registration with:', { 
+        email, 
+        fullName,
+        password: '******'
+      });
+      
+      await register({ 
+        email, 
+        fullName,
+        password
+      });
+      
+      console.log('Registration successful, redirecting to dashboard');
     navigate('/dashboard/home');
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /**
@@ -59,23 +102,6 @@ const Signup = () => {
   const toggleShowPassword = () => {
     setShowPassword(!showPassword);
   };
-
-  /**
-   * Advances to the next step in the form
-   */
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  /**
-   * Goes back to the previous step in the form
-   */
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
-  // Form steps
-  const steps = ['Account Details', 'Personal Information'];
 
   return (
     <Box 
@@ -96,7 +122,7 @@ const Signup = () => {
             p: { xs: 3, md: 5 }, 
             borderRadius: 4,
             boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-            background: 'rgba(255, 255, 255, 0.9)',
+            backgroundColor: alpha(theme.palette.background.paper, 0.9),
             backdropFilter: 'blur(10px)',
           }}
         >
@@ -118,6 +144,13 @@ const Signup = () => {
             Join us to analyze and improve web accessibility
           </Typography>
 
+          {/* Error Alert */}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+
           {/* Signup Form */}
           <Box
             component="form"
@@ -128,18 +161,7 @@ const Signup = () => {
               gap: 3
             }}
           >
-            {/* Form Steps Indicator */}
-            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-              {steps.map((label) => (
-                <Step key={label}>
-                  <StepLabel>{label}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-
-            {/* Step 1: Account Details */}
-            {activeStep === 0 && (
-              <>
+            {/* Email Field */}
                 <TextField 
                   label="Email" 
                   type="email" 
@@ -148,6 +170,7 @@ const Signup = () => {
                   required 
                   fullWidth 
                   variant="outlined"
+              disabled={isSubmitting}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -157,6 +180,26 @@ const Signup = () => {
                   }}
                 />
                 
+            {/* Full Name Field */}
+            <TextField 
+              label="Full Name" 
+              type="text" 
+              value={fullName} 
+              onChange={(e) => setFullName(e.target.value)} 
+              required
+              fullWidth 
+              variant="outlined"
+              disabled={isSubmitting}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Person color="action" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            
+            {/* Password Field */}
                 <TextField 
                   label="Password" 
                   type={showPassword ? 'text' : 'password'} 
@@ -165,6 +208,7 @@ const Signup = () => {
                   required 
                   fullWidth 
                   variant="outlined"
+              disabled={isSubmitting}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -177,6 +221,7 @@ const Signup = () => {
                           aria-label="toggle password visibility"
                           onClick={toggleShowPassword}
                           edge="end"
+                      disabled={isSubmitting}
                         >
                           {showPassword ? <VisibilityOff /> : <Visibility />}
                         </IconButton>
@@ -185,6 +230,7 @@ const Signup = () => {
                   }}
                 />
                 
+            {/* Confirm Password Field */}
                 <TextField 
                   label="Confirm Password" 
                   type={showPassword ? 'text' : 'password'} 
@@ -193,6 +239,7 @@ const Signup = () => {
                   required 
                   fullWidth 
                   variant="outlined"
+              disabled={isSubmitting}
                   error={password !== confirmPassword && confirmPassword !== ''}
                   helperText={
                     password !== confirmPassword && confirmPassword !== '' 
@@ -208,12 +255,13 @@ const Signup = () => {
                   }}
                 />
                 
+            {/* Submit Button */}
                 <Button 
+              type="submit" 
                   variant="contained" 
                   size="large" 
                   fullWidth
-                  onClick={handleNext}
-                  disabled={!email || !password || !confirmPassword || password !== confirmPassword}
+              disabled={isSubmitting}
                   sx={{ 
                     py: 1.5, 
                     borderRadius: 2,
@@ -221,62 +269,8 @@ const Signup = () => {
                     mt: 2
                   }}
                 >
-                  Next
-                </Button>
-              </>
-            )}
-
-            {/* Step 2: Personal Information */}
-            {activeStep === 1 && (
-              <>
-                <TextField 
-                  label="Full Name" 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  required 
-                  fullWidth 
-                  variant="outlined"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Person color="action" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                
-                <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                  <Button 
-                    variant="outlined" 
-                    size="large" 
-                    onClick={handleBack}
-                    sx={{ 
-                      py: 1.5, 
-                      borderRadius: 2,
-                      flex: 1
-                    }}
-                  >
-                    Back
+              {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Create Account'}
                   </Button>
-                  
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    size="large" 
-                    disabled={!name}
-                    sx={{ 
-                      py: 1.5, 
-                      borderRadius: 2,
-                      boxShadow: '0 4px 14px rgba(85, 98, 255, 0.4)',
-                      flex: 1
-                    }}
-                  >
-                    Create Account
-                  </Button>
-                </Box>
-              </>
-            )}
             
             {/* Sign In Link */}
             <Box sx={{ textAlign: 'center', mt: 3 }}>

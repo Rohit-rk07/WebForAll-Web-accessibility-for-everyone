@@ -1,12 +1,88 @@
-# React + Vite
+# Accessibility Analyzer Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the frontend client for the Accessibility Analyzer application. It provides a user-friendly interface for analyzing web content for accessibility issues.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Multiple input methods:
+  - URL analysis
+  - HTML file upload
+  - Direct HTML code input
+- Comprehensive accessibility reports
+- Score visualization
+- Issue categorization and filtering
+- WCAG compliance information
 
-## Expanding the ESLint configuration
+## Setup
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+
+- Node.js 14.x or higher
+- npm or yarn
+
+### Installation
+
+1. Install dependencies:
+
+```bash
+# Using npm
+npm install
+
+# Using yarn
+yarn
+```
+
+2. Create a `.env` file in the root directory with the following content:
+
+```
+# API Configuration
+VITE_API_URL=http://localhost:8000
+
+# Environment
+VITE_APP_ENV=development
+```
+
+> **Note**: Adjust the `VITE_API_URL` if your backend server is running on a different host or port.
+
+## Running the Client
+
+Start the development server:
+
+```bash
+# Using npm
+npm run dev
+
+# Using yarn
+yarn dev
+```
+
+The client will be available at http://localhost:5173.
+
+## Building for Production
+
+Build the client for production:
+
+```bash
+# Using npm
+npm run build
+
+# Using yarn
+yarn build
+```
+
+The built files will be in the `dist` directory.
+
+## Project Structure
+
+- `src/components`: Reusable UI components
+- `src/pages`: Page components
+- `src/contexts`: React contexts for state management
+- `src/layouts`: Layout components
+- `src/assets`: Static assets
+
+## Technologies Used
+
+- React
+- Material-UI
+- React Router
+- Vite
