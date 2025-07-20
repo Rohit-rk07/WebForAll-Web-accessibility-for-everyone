@@ -18,6 +18,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 
 /**
  * Protected Route Component
+ * 
  * Redirects to login if not authenticated
  */
 const ProtectedRoute = () => {

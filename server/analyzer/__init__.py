@@ -1,5 +1,6 @@
 """Accessibility analyzer package."""
 
-from .core import analyze_static
+# Only dynamic analysis is used now - static analysis removed
+# Main analysis functions are in simple_playwright.py and playwright_helper.py
 
-__all__ = ['analyze_static'] 
+__all__ = [] 

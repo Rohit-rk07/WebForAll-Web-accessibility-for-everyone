@@ -121,8 +121,12 @@ def run_analysis(data: Dict[str, Any]):
             context = browser.new_context(viewport={'width': 1280, 'height': 720})
             page = context.new_page()
             
-            # Navigate to URL
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            # Navigate to URL with better timing for consistency
+            page.goto(url, wait_until="networkidle", timeout=60000)
+            
+            # Wait for JavaScript to settle and dynamic content to load
+            page.wait_for_timeout(2000)
+            page.wait_for_load_state("networkidle")
             
             # Inject Axe
             page.add_script_tag(
