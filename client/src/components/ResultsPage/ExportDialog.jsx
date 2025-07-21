@@ -11,8 +11,34 @@ import {
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { extractAxeResults } from '../../utils/resultsUtils';
+import { extractAxeResults, calculateAccessibilityScore } from '../../utils/resultsUtils';
+
+// Constants
+const PDF_CONFIG = {
+  orientation: 'portrait',
+  unit: 'mm',
+  format: 'a4'
+};
+
+const COLORS = {
+  primary: [67, 97, 238],
+  success: [40, 167, 69],
+  warning: [255, 193, 7],
+  danger: [220, 53, 69],
+  secondary: [108, 117, 125],
+  light: [248, 249, 250],
+  border: [200, 200, 200],
+  text: [0, 0, 0],
+  textSecondary: [100, 100, 100],
+  white: [255, 255, 255]
+};
+
+const SEVERITY_CONFIG = [
+  { label: 'Critical', key: 'critical', color: COLORS.danger },
+  { label: 'Serious', key: 'serious', color: [255, 107, 107] },
+  { label: 'Moderate', key: 'moderate', color: COLORS.warning },
+  { label: 'Minor', key: 'minor', color: COLORS.secondary }
+];
 
 const ExportDialog = ({ open, onClose, result, resultsRef }) => {
   const [loading, setLoading] = useState(false);
@@ -23,8 +49,16 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
     try {
       setLoading(true);
       
-      const element = resultsRef.current;
-      const axeResults = extractAxeResults(result);
+      // Debug: Log the result data structure
+      console.log('PDF Export - Result data:', result);
+      
+      const axeResults = {
+        violations: extractAxeResults(result, 'violations'),
+        passes: extractAxeResults(result, 'passes'),
+        incomplete: extractAxeResults(result, 'incomplete'),
+        inapplicable: extractAxeResults(result, 'inapplicable')
+      };
+      
       const resultCounts = {
         violations: axeResults.violations?.length || 0,
         passes: axeResults.passes?.length || 0,
@@ -32,299 +66,377 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
         inapplicable: axeResults.inapplicable?.length || 0
       };
       
-      // Create PDF without screenshot - structured report
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
+      // Debug: Log the extracted counts
+      console.log('PDF Export - Result counts:', resultCounts);
+      
+      // Create PDF with proper document structure
+      const pdf = new jsPDF(PDF_CONFIG);
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      let yPosition = 20;
+      const margin = 20;
+      const contentWidth = pdfWidth - (margin * 2);
+      let yPosition = margin;
       
-      // Add title and header
-      pdf.setFontSize(20);
-      pdf.setTextColor(67, 97, 238);
-      pdf.text('Accessibility Analysis Report', pdfWidth / 2, yPosition, { align: 'center' });
-      yPosition += 10;
+      // Helper function to check if we need a new page
+      const checkNewPage = (requiredSpace = 20) => {
+        if (yPosition + requiredSpace > pdfHeight - margin) {
+          pdf.addPage();
+          yPosition = margin;
+          return true;
+        }
+        return false;
+      };
       
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdfWidth / 2, yPosition, { align: 'center' });
+      // Helper function to add section header
+      const addSectionHeader = (title, color = [0, 0, 0], fontSize = 16) => {
+        checkNewPage(15);
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(...color);
+        pdf.text(title, margin, yPosition);
+        yPosition += fontSize === 16 ? 12 : 10;
+        
+        // Add underline for main sections
+        if (fontSize === 16) {
+          pdf.setDrawColor(200, 200, 200);
+          pdf.line(margin, yPosition - 2, pdfWidth - margin, yPosition - 2);
+          yPosition += 6;
+        }
+      };
+      
+      // Helper function to add wrapped text
+      const addWrappedText = (text, fontSize = 10, color = [0, 0, 0], indent = 0) => {
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(...color);
+        const wrappedText = pdf.splitTextToSize(text, contentWidth - indent);
+        const textHeight = wrappedText.length * (fontSize * 0.4) + 2;
+        
+        checkNewPage(textHeight);
+        pdf.text(wrappedText, margin + indent, yPosition);
+        yPosition += textHeight;
+        return textHeight;
+      };
+      
+      // Helper function to add code block
+      const addCodeBlock = (code, maxLength = 200) => {
+        if (!code) return;
+        
+        let displayCode = code.trim();
+        if (displayCode.length > maxLength) {
+          displayCode = displayCode.substring(0, maxLength) + '...';
+        }
+        
+        const wrappedCode = pdf.splitTextToSize(displayCode, contentWidth - 20);
+        const codeHeight = Math.min(wrappedCode.length * 4 + 8, 30);
+        
+        checkNewPage(codeHeight + 5);
+        
+        // Add code background
+        pdf.setFillColor(248, 249, 250);
+        pdf.setDrawColor(220, 220, 220);
+        pdf.rect(margin + 10, yPosition - 2, contentWidth - 20, codeHeight, 'FD');
+        
+        // Add code text
+        pdf.setFontSize(8);
+        pdf.setTextColor(50, 50, 50);
+        const maxLines = Math.floor((codeHeight - 4) / 4);
+        for (let i = 0; i < Math.min(wrappedCode.length, maxLines); i++) {
+          pdf.text(wrappedCode[i], margin + 12, yPosition + 2 + (i * 4));
+        }
+        
+        yPosition += codeHeight + 6;
+      };
+      
+      // Document Title and Metadata
+      pdf.setFontSize(24);
+      pdf.setTextColor(...COLORS.primary);
+      pdf.text('Web Accessibility Analysis Report', pdfWidth / 2, yPosition, { align: 'center' });
       yPosition += 15;
       
-      // Add summary section
+      pdf.setFontSize(11);
+      pdf.setTextColor(...COLORS.textSecondary);
+      const reportDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      pdf.text(`Generated on: ${reportDate}`, pdfWidth / 2, yPosition, { align: 'center' });
+      yPosition += 20;
+      
+      // Executive Summary Section
+      addSectionHeader('Executive Summary', COLORS.primary, 18);
+      
+      // Calculate score properly using the same logic as the main page
+      const scoreData = calculateAccessibilityScore(result);
+      const score = scoreData?.score || result.score || 0;
+      const actualScore = typeof score === 'object' ? score.value || 0 : score;
+      
       pdf.setFontSize(14);
-      pdf.setTextColor(0, 0, 0);
-      const score = result.score || { value: 0 };
-      pdf.text(`Accessibility Score: ${score.value}/100`, 14, yPosition);
-      yPosition += 8;
+      pdf.setTextColor(...COLORS.text);
+      pdf.text(`Overall Accessibility Score: ${actualScore}/100`, margin, yPosition);
+      yPosition += 10;
       
-      pdf.setFontSize(12);
-      pdf.text(`Summary: ${resultCounts.violations} violations, ${resultCounts.passes} passes, ${resultCounts.incomplete} need review, ${resultCounts.inapplicable} not applicable`, 14, yPosition);
-      yPosition += 8;
+      // Debug: Log score calculation
+      console.log('PDF Export - Score calculation:', { scoreData, score, actualScore });
       
-      // Add severity breakdown if violations exist
+      // Score interpretation
+      let scoreInterpretation = '';
+      if (actualScore >= 90) scoreInterpretation = 'Excellent - Meets high accessibility standards';
+      else if (actualScore >= 75) scoreInterpretation = 'Good - Minor improvements needed';
+      else if (actualScore >= 60) scoreInterpretation = 'Fair - Several issues require attention';
+      else scoreInterpretation = 'Needs Improvement - Significant accessibility barriers present';
+      
+      addWrappedText(scoreInterpretation, 11, [100, 100, 100]);
+      yPosition += 5;
+      
+      // Results Summary Table
+      const summaryData = [
+        ['Test Results', 'Count', 'Status'],
+        ['Violations', resultCounts.violations.toString(), resultCounts.violations > 0 ? 'Action Required' : 'None Found'],
+        ['Passed Tests', resultCounts.passes.toString(), 'Compliant'],
+        ['Manual Review', resultCounts.incomplete.toString(), 'Verification Needed'],
+        ['Not Applicable', resultCounts.inapplicable.toString(), 'N/A']
+      ];
+      
+      checkNewPage(40);
+      const tableY = yPosition;
+      const colWidths = [60, 30, 50];
+      const rowHeight = 7;
+      
+      summaryData.forEach((row, rowIndex) => {
+        let xPos = margin;
+        const isHeader = rowIndex === 0;
+        const fillColor = isHeader ? [67, 97, 238] : [rowIndex % 2 === 0 ? 250 : 255, rowIndex % 2 === 0 ? 250 : 255, rowIndex % 2 === 0 ? 250 : 255];
+        
+        row.forEach((cell, colIndex) => {
+          const cellY = tableY + (rowIndex * rowHeight);
+          
+          // Set styling based on row type
+          pdf.setFillColor(...fillColor);
+          pdf.setTextColor(isHeader ? 255 : 0, isHeader ? 255 : 0, isHeader ? 255 : 0);
+          pdf.setFontSize(isHeader ? 10 : 9);
+          
+          // Draw cell background and border
+          pdf.rect(xPos, cellY, colWidths[colIndex], rowHeight, 'FD');
+          pdf.setDrawColor(200, 200, 200);
+          pdf.rect(xPos, cellY, colWidths[colIndex], rowHeight, 'S');
+          
+          // Add cell text
+          pdf.text(cell, xPos + 2, cellY + 5);
+          xPos += colWidths[colIndex];
+        });
+      });
+      
+      yPosition = tableY + (summaryData.length * rowHeight) + 15;
+      
+      // Severity Breakdown
       if (resultCounts.violations > 0) {
         const severityCounts = result.severityCounts || { critical: 0, serious: 0, moderate: 0, minor: 0 };
-        let severityText = 'Severity: ';
+        addWrappedText('Severity Breakdown:', 12, COLORS.text);
         
-        if (severityCounts.critical > 0) severityText += `${severityCounts.critical} Serious, `;
-        if (severityCounts.serious > 0) severityText += `${severityCounts.serious} Moderate, `;
-        if (severityCounts.moderate > 0) severityText += `${severityCounts.moderate} Moderate, `;
-        if (severityCounts.minor > 0) severityText += `${severityCounts.minor} Minor`;
+        SEVERITY_CONFIG.forEach(severity => {
+          const count = severityCounts[severity.key] || 0;
+          if (count > 0) {
+            pdf.setFontSize(10);
+            pdf.setTextColor(...severity.color);
+            pdf.text(`• ${severity.label}: ${count} issue${count > 1 ? 's' : ''}`, margin + 10, yPosition);
+            yPosition += 6;
+          }
+        });
         
-        severityText = severityText.replace(/, $/, '');
-        pdf.text(severityText, 14, yPosition);
-        yPosition += 8;
+        yPosition += 10;
       }
-      
-      // Add horizontal line
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(14, yPosition, pdfWidth - 14, yPosition);
-      yPosition += 10;
       
       // Violations Section
       if (axeResults.violations && axeResults.violations.length > 0) {
-        // Check if we need a new page
-        if (yPosition > pdfHeight - 30) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        addSectionHeader('Accessibility Violations', COLORS.danger, 16);
         
-        pdf.setFontSize(16);
-        pdf.setTextColor(220, 53, 69); // Red color
-        pdf.text(`Violations (${resultCounts.violations})`, 14, yPosition);
-        yPosition += 10;
+        addWrappedText(
+          `Found ${resultCounts.violations} accessibility violation${resultCounts.violations > 1 ? 's' : ''} that must be addressed to improve compliance.`,
+          11, [80, 80, 80]
+        );
+        yPosition += 5;
         
         axeResults.violations.forEach((violation, index) => {
-          // Check if we need a new page
-          if (yPosition > pdfHeight - 50) {
-            pdf.addPage();
-            yPosition = 20;
-          }
+          checkNewPage(35);
           
-          // Violation title
+          // Violation number and title
+          pdf.setFontSize(13);
+          pdf.setTextColor(220, 53, 69);
+          pdf.text(`${index + 1}.`, margin, yPosition);
+          
           pdf.setFontSize(12);
           pdf.setTextColor(0, 0, 0);
           const title = violation.help || violation.id || 'Unknown Issue';
-          pdf.text(`${index + 1}. ${title}`, 20, yPosition);
-          yPosition += 8;
+          const wrappedTitle = pdf.splitTextToSize(title, contentWidth - 15);
+          pdf.text(wrappedTitle, margin + 8, yPosition);
+          yPosition += wrappedTitle.length * 5 + 3;
           
-          // Impact level
-          if (violation.impact) {
-            pdf.setFontSize(10);
-            pdf.setTextColor(150, 150, 150);
-            pdf.text(`Impact: ${violation.impact.toUpperCase()}`, 25, yPosition);
-            yPosition += 6;
-          }
+          // Impact and WCAG info in a styled box
+          const impactColor = {
+            'critical': [220, 53, 69],
+            'serious': [255, 107, 107], 
+            'moderate': [255, 193, 7],
+            'minor': [108, 117, 125]
+          }[violation.impact] || [108, 117, 125];
           
-          // Violation description
-          if (violation.description) {
-            pdf.setFontSize(10);
-            pdf.setTextColor(80, 80, 80);
-            const description = violation.description.replace(/<[^>]*>/g, ''); // Remove HTML tags
-            const wrappedDescription = pdf.splitTextToSize(description, pdfWidth - 50);
-            const linesToShow = Math.min(wrappedDescription.length, 4); // Show up to 4 lines
-            pdf.text(wrappedDescription.slice(0, linesToShow), 25, yPosition);
-            yPosition += linesToShow * 5 + 3;
-          }
+          pdf.setFillColor(250, 250, 250);
+          pdf.setDrawColor(200, 200, 200);
+          pdf.rect(margin + 10, yPosition - 2, contentWidth - 20, 12, 'FD');
+          
+          pdf.setFontSize(10);
+          pdf.setTextColor(...impactColor);
+          pdf.text(`Impact: ${(violation.impact || 'unknown').toUpperCase()}`, margin + 12, yPosition + 3);
           
           // WCAG Guidelines
           if (violation.tags && violation.tags.length > 0) {
             const wcagTags = violation.tags.filter(tag => tag.startsWith('wcag'));
             if (wcagTags.length > 0) {
-              pdf.setFontSize(9);
               pdf.setTextColor(100, 100, 100);
-              pdf.text(`WCAG: ${wcagTags.join(', ').toUpperCase()}`, 25, yPosition);
-              yPosition += 6;
+              pdf.text(`WCAG: ${wcagTags.join(', ').toUpperCase()}`, margin + 80, yPosition + 3);
             }
           }
           
-          // HTML code snippet if available
-          if (violation.nodes && violation.nodes.length > 0 && violation.nodes[0].html) {
-            pdf.setFontSize(9);
-            pdf.setTextColor(50, 50, 50);
-            pdf.text('Affected Element:', 25, yPosition);
-            yPosition += 5;
-            
-            // Add code background
-            let htmlCode = violation.nodes[0].html.trim();
-            if (htmlCode.length > 150) {
-              htmlCode = htmlCode.substring(0, 150) + '...';
-            }
-            
-            const wrappedCode = pdf.splitTextToSize(htmlCode, pdfWidth - 60);
-            const codeHeight = Math.min(wrappedCode.length * 4 + 6, 20);
-            
-            pdf.setFillColor(248, 249, 250);
-            pdf.rect(25, yPosition - 2, pdfWidth - 50, codeHeight, 'F');
-            
-            pdf.setFontSize(8);
-            pdf.setTextColor(50, 50, 50);
-            const codeLinesShown = Math.min(wrappedCode.length, 3);
-            for (let i = 0; i < codeLinesShown; i++) {
-              pdf.text(wrappedCode[i], 27, yPosition + 2 + (i * 4));
-            }
-            
-            yPosition += codeHeight + 5;
+          yPosition += 15;
+          
+          // Description
+          if (violation.description) {
+            addWrappedText('Issue Description:', 11, [0, 0, 0], 10);
+            const cleanDescription = violation.description.replace(/<[^>]*>/g, '').trim();
+            addWrappedText(cleanDescription, 10, [60, 60, 60], 15);
+            yPosition += 3;
           }
           
-          yPosition += 5; // Space between violations
+          // How to fix
+          if (violation.helpUrl) {
+            addWrappedText('Learn More:', 11, [0, 0, 0], 10);
+            addWrappedText(violation.helpUrl, 9, [67, 97, 238], 15);
+            yPosition += 3;
+          }
+          
+          // Affected elements
+          if (violation.nodes && violation.nodes.length > 0) {
+            addWrappedText(`Affected Element${violation.nodes.length > 1 ? 's' : ''}:`, 11, [0, 0, 0], 10);
+            
+            violation.nodes.slice(0, 3).forEach((node, nodeIndex) => {
+              if (node.html) {
+                addCodeBlock(node.html, 180);
+              }
+              
+              // Add target info if available
+              if (node.target && node.target.length > 0) {
+                addWrappedText(`Selector: ${node.target.join(', ')}`, 9, [100, 100, 100], 15);
+              }
+            });
+            
+            if (violation.nodes.length > 3) {
+              addWrappedText(`... and ${violation.nodes.length - 3} more affected elements`, 9, [120, 120, 120], 15);
+            }
+          }
+          
+          yPosition += 8; // Space between violations
         });
         
-        yPosition += 8;
+        yPosition += 10;
       }
       
       // Passes Section
       if (axeResults.passes && axeResults.passes.length > 0) {
-        // Check if we need a new page
-        if (yPosition > pdfHeight - 30) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        addSectionHeader('Passed Accessibility Tests', [40, 167, 69], 16);
         
-        pdf.setFontSize(16);
-        pdf.setTextColor(40, 167, 69); // Green color
-        pdf.text(`Passed Tests (${resultCounts.passes})`, 14, yPosition);
-        yPosition += 10;
-        
-        pdf.setFontSize(10);
-        pdf.setTextColor(60, 60, 60);
-        pdf.text(`Great! Your website passes ${resultCounts.passes} accessibility tests.`, 20, yPosition);
+        addWrappedText(
+          `Excellent! Your website successfully passes ${resultCounts.passes} accessibility test${resultCounts.passes > 1 ? 's' : ''}. These indicate areas where your site meets accessibility standards.`,
+          11, [60, 60, 60]
+        );
         yPosition += 8;
         
-        pdf.setFontSize(10);
-        pdf.setTextColor(80, 80, 80);
+        // Group passes by category if possible
+        const passesToShow = Math.min(axeResults.passes.length, 20);
+        const displayPasses = axeResults.passes.slice(0, passesToShow);
         
-        // List first 15 passed tests with better formatting
-        const passesToShow = Math.min(axeResults.passes.length, 15);
-        axeResults.passes.slice(0, passesToShow).forEach((pass, index) => {
-          if (yPosition > pdfHeight - 15) {
-            pdf.addPage();
-            yPosition = 20;
-          }
+        // Create a simple list with better formatting
+        displayPasses.forEach((pass, index) => {
+          checkNewPage(8);
           
+          pdf.setFontSize(10);
+          pdf.setTextColor(40, 167, 69);
+          pdf.text('✓', margin + 5, yPosition);
+          
+          pdf.setTextColor(0, 0, 0);
           const title = pass.help || pass.id || 'Unknown Rule';
-          // Wrap long titles
-          const wrappedTitle = pdf.splitTextToSize(title, pdfWidth - 60);
-          if (wrappedTitle.length > 1) {
-            pdf.text(`${index + 1}. ${wrappedTitle[0]}`, 20, yPosition);
-            yPosition += 4;
-            pdf.text(`   ${wrappedTitle[1]}`, 20, yPosition);
-            yPosition += 5;
-          } else {
-            pdf.text(`${index + 1}. ${title}`, 20, yPosition);
-            yPosition += 5;
-          }
+          const wrappedTitle = pdf.splitTextToSize(title, contentWidth - 20);
+          pdf.text(wrappedTitle, margin + 12, yPosition);
+          yPosition += Math.max(wrappedTitle.length * 4, 6);
         });
         
-        if (axeResults.passes.length > 15) {
-          pdf.setFontSize(9);
-          pdf.setTextColor(120, 120, 120);
-          pdf.text(`... and ${axeResults.passes.length - 15} more passing tests`, 20, yPosition);
-          yPosition += 6;
+        if (axeResults.passes.length > passesToShow) {
+          yPosition += 3;
+          addWrappedText(
+            `... and ${axeResults.passes.length - passesToShow} additional passing tests`,
+            10, [120, 120, 120], 10
+          );
         }
         
-        yPosition += 8;
+        yPosition += 10;
       }
       
       // Needs Review Section (Incomplete)
       if (axeResults.incomplete && axeResults.incomplete.length > 0) {
-        // Check if we need a new page
-        if (yPosition > pdfHeight - 30) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        addSectionHeader('Manual Review Required', [255, 193, 7], 16);
         
-        pdf.setFontSize(16);
-        pdf.setTextColor(255, 193, 7); // Yellow/Orange color
-        pdf.text(`Manual Review Required (${resultCounts.incomplete})`, 14, yPosition);
-        yPosition += 10;
-        
-        pdf.setFontSize(10);
-        pdf.setTextColor(60, 60, 60);
-        pdf.text(`These ${resultCounts.incomplete} items require manual testing to ensure full compliance.`, 20, yPosition);
+        addWrappedText(
+          `${resultCounts.incomplete} accessibility rule${resultCounts.incomplete > 1 ? 's' : ''} require manual testing to ensure full compliance. These items couldn't be automatically verified and need human review.`,
+          11, [80, 80, 80]
+        );
         yPosition += 8;
         
-        pdf.setFontSize(10);
-        pdf.setTextColor(80, 80, 80);
-        
-        // List incomplete tests with descriptions
         axeResults.incomplete.forEach((item, index) => {
-          if (yPosition > pdfHeight - 25) {
-            pdf.addPage();
-            yPosition = 20;
-          }
+          checkNewPage(20);
           
+          // Item number and title
+          pdf.setFontSize(11);
+          pdf.setTextColor(255, 193, 7);
+          pdf.text(`${index + 1}.`, margin, yPosition);
+          
+          pdf.setTextColor(0, 0, 0);
           const title = item.help || item.id || 'Unknown Rule';
-          // Wrap long titles
-          const wrappedTitle = pdf.splitTextToSize(title, pdfWidth - 60);
-          if (wrappedTitle.length > 1) {
-            pdf.text(`${index + 1}. ${wrappedTitle[0]}`, 20, yPosition);
-            yPosition += 4;
-            pdf.text(`   ${wrappedTitle[1]}`, 20, yPosition);
-            yPosition += 6;
-          } else {
-            pdf.text(`${index + 1}. ${title}`, 20, yPosition);
-            yPosition += 6;
+          const wrappedTitle = pdf.splitTextToSize(title, contentWidth - 15);
+          pdf.text(wrappedTitle, margin + 8, yPosition);
+          yPosition += wrappedTitle.length * 4 + 5;
+          
+          // Description with better formatting
+          if (item.description) {
+            const cleanDescription = item.description.replace(/<[^>]*>/g, '').trim();
+            if (cleanDescription) {
+              addWrappedText('What to check:', 10, [100, 100, 100], 10);
+              addWrappedText(cleanDescription, 9, [60, 60, 60], 15);
+              yPosition += 3;
+            }
           }
           
-          // Add description if available
-          if (item.description) {
-            pdf.setFontSize(9);
-            pdf.setTextColor(100, 100, 100);
-            const description = item.description.replace(/<[^>]*>/g, '').trim();
-            if (description) {
-              const wrappedDesc = pdf.splitTextToSize(description, pdfWidth - 60);
-              const descLinesToShow = Math.min(wrappedDesc.length, 2);
-              pdf.text(wrappedDesc.slice(0, descLinesToShow), 25, yPosition);
-              yPosition += descLinesToShow * 4 + 3;
-            }
-            pdf.setFontSize(10);
-            pdf.setTextColor(80, 80, 80);
+          // Manual testing guidance
+          if (item.helpUrl) {
+            addWrappedText('Testing guidance:', 10, [100, 100, 100], 10);
+            addWrappedText(item.helpUrl, 9, [67, 97, 238], 15);
           }
+          
+          yPosition += 6;
         });
         
-        yPosition += 8;
-      }
-      
-      // Not Applicable Section (brief summary)
-      if (axeResults.inapplicable && axeResults.inapplicable.length > 0) {
-        // Check if we need a new page
-        if (yPosition > pdfHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        
-        pdf.setFontSize(14);
-        pdf.setTextColor(108, 117, 125); // Gray color
-        pdf.text(`Not Applicable (${resultCounts.inapplicable})`, 14, yPosition);
-        yPosition += 8;
-        
-        pdf.setFontSize(10);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text(`${resultCounts.inapplicable} rules were not applicable to this page content.`, 20, yPosition);
         yPosition += 10;
       }
       
       // Not Applicable Section
       if (axeResults.inapplicable && axeResults.inapplicable.length > 0) {
-        // Check if we need a new page
-        if (yPosition > pdfHeight - 30) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        addSectionHeader('Not Applicable Rules', [108, 117, 125], 14);
         
-        pdf.setFontSize(16);
-        pdf.setTextColor(108, 117, 125); // Gray color
-        pdf.text(`Not Applicable (${resultCounts.inapplicable} rules)`, 14, yPosition);
-        yPosition += 8;
+        addWrappedText(
+          `${resultCounts.inapplicable} accessibility rules were not applicable to this page content. This is normal and indicates that certain tests (like image alt-text checks) weren't relevant because the corresponding elements weren't present.`,
+          10, [100, 100, 100]
+        );
         
-        pdf.setFontSize(10);
-        pdf.setTextColor(100, 100, 100);
-        pdf.text('These tests were not applicable to the content (e.g., image tests when no images are present).', 20, yPosition);
         yPosition += 10;
       }
       

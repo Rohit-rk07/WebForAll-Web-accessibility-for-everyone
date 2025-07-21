@@ -13,15 +13,27 @@ import { Box, Button } from '@mui/material';
  */
 const DesktopNav = ({ navItems, isLoggedIn, navigate, colors }) => {
   return (
-    <Box sx={{ display: 'flex', gap: 2 }}>
+    <Box sx={{ display: 'flex', gap: 1 }}>
       {navItems.map((item) => (
         <Button 
           key={item.text}
+          variant="contained"
           sx={{ 
-            color: colors.text,
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+            color: 'white',
+            fontWeight: 'bold',
+            px: 3,
+            py: 1,
+            borderRadius: 2,
+            textTransform: 'none',
+            fontSize: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             '&:hover': {
-              bgcolor: colors.hover
-            }
+              background: `linear-gradient(135deg, ${colors.secondary} 0%, ${colors.primary} 100%)`,
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+            },
+            transition: 'all 0.2s ease'
           }}
           onClick={() => navigate(item.path)}
         >

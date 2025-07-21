@@ -141,15 +141,54 @@ const History = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Website Analysis History
-      </Typography>
+    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+      {/* Header Section */}
+      <Paper elevation={1} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          Analysis History
+        </Typography>
+        <Typography variant="body1" sx={{ opacity: 0.9 }}>
+          Track your accessibility testing progress and revisit previous reports
+        </Typography>
+      </Paper>
       
-      <Typography variant="body1" color="text.secondary" paragraph>
-        View and manage your previous accessibility analysis reports
-      </Typography>
+      {/* Stats Cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="h6" color="primary" fontWeight="bold">
+            {reports.length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Total Reports
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="h6" color="success.main" fontWeight="bold">
+            {reports.filter(r => r.score >= 80).length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Good Scores (80+)
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="h6" color="warning.main" fontWeight="bold">
+            {reports.filter(r => r.score >= 60 && r.score < 80).length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Fair Scores (60-79)
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="h6" color="error.main" fontWeight="bold">
+            {reports.filter(r => r.score < 60).length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Needs Work (&lt;60)
+          </Typography>
+        </Paper>
+      </Box>
       
+      {/* Search and Filter Section */}
       <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
         <TextField
           placeholder="Search websites..."

@@ -35,41 +35,38 @@ const AiChatbot = () => {
   useEffect(() => {
     window.aiChatbot = {
       open: () => setIsOpen(true),
-      addContextMessage: (message) => {
+      addContextMessage: async (message) => {
         const userMessage = {
           role: 'user',
           content: message
         };
         
-        setMessages(prev => {
-          const newMessages = [...prev, userMessage];
-          
-          // Auto-send the message to get AI response
-          setIsLoading(true);
-          aiService.sendChatMessage(newMessages)
-            .then(response => {
-              const assistantMessage = {
-                role: 'assistant',
-                content: response.content
-              };
-              setMessages(current => [...current, assistantMessage]);
-            })
-            .catch(error => {
-              console.error('Error sending context message:', error);
-              const errorMessage = {
-                role: 'assistant',
-                content: error.message || `I'm currently experiencing technical difficulties. Please try again later.`
-              };
-              setMessages(current => [...current, errorMessage]);
-            })
-            .finally(() => {
-              setIsLoading(false);
-            });
-          
-          return newMessages;
-        });
-        
+        // Add user message first
+        setMessages(prev => [...prev, userMessage]);
         setIsOpen(true);
+        setIsLoading(true);
+        
+        try {
+          // Send message with current messages + new user message
+          const currentMessages = [...messages, userMessage];
+          const response = await aiService.sendChatMessage(currentMessages);
+          
+          const assistantMessage = {
+            role: 'assistant',
+            content: response.content
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+        } catch (error) {
+          console.error('Error sending context message:', error);
+          const errorMessage = {
+            role: 'assistant',
+            content: error.message || `I'm currently experiencing technical difficulties. Please try again later.`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
     
@@ -243,10 +240,19 @@ const AiChatbot = () => {
                   p: 1.5,
                   borderRadius: 2,
                   maxWidth: '85%',
-                  bgcolor: message.role === 'user' ? 'primary.main' : 'background.default',
-                  color: message.role === 'user' ? 'white' : 'text.primary',
-                  border: message.role === 'assistant' ? `1px solid` : 'none',
-                  borderColor: 'divider'
+                  bgcolor: message.role === 'user' 
+                    ? 'primary.main' 
+                    : theme.palette.mode === 'dark' 
+                      ? 'grey.800' 
+                      : '#ffffff',
+                  color: message.role === 'user' 
+                    ? 'white' 
+                    : theme.palette.mode === 'dark' 
+                      ? 'grey.100' 
+                      : '#000000',
+                  border: message.role === 'assistant' ? `2px solid` : 'none',
+                  borderColor: theme.palette.mode === 'dark' ? 'grey.700' : '#e0e0e0',
+                  boxShadow: message.role === 'assistant' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
                 <Box>
@@ -286,18 +292,19 @@ const AiChatbot = () => {
                           <Box
                             component="pre"
                             sx={{
-                              bgcolor: theme.palette.mode === 'dark' ? '#23272f' : '#f8f9fa',
+                              bgcolor: theme.palette.mode === 'dark' ? '#23272f' : '#2d3748',
+                              color: theme.palette.mode === 'dark' ? '#e2e8f0' : '#ffffff',
                               p: 2,
                               borderRadius: 2,
                               overflow: 'auto',
                               fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
                               fontSize: '0.875rem',
                               lineHeight: 1.5,
-                              border: `1px solid ${theme.palette.divider}`,
+                              border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : '1px solid #4a5568',
                               m: 0
                             }}
                           >
-                            <code>
+                            <code style={{ color: 'inherit' }}>
                               {code}
                             </code>
                           </Box>
@@ -316,9 +323,11 @@ const AiChatbot = () => {
                 sx={{
                   p: 1.5,
                   borderRadius: 2,
-                  bgcolor: 'background.default',
-                  border: `1px solid`,
-                  borderColor: 'divider'
+                  bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : '#ffffff',
+                  color: theme.palette.mode === 'dark' ? 'grey.100' : '#000000',
+                  border: `2px solid`,
+                  borderColor: theme.palette.mode === 'dark' ? 'grey.700' : '#e0e0e0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>

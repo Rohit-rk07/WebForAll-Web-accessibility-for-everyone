@@ -16,10 +16,7 @@ import {
 } from '@mui/material';
 import { 
   ArrowBack,
-  Download,
-  Psychology,
-  Close,
-  SmartToy
+  Download
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
@@ -34,9 +31,6 @@ import {
   calculateAccessibilityScore, 
   calculateResultCounts 
 } from '../utils/resultsUtils';
-
-// Import AI service
-import aiService from '../services/aiService';
 
 /**
  * Results Page component

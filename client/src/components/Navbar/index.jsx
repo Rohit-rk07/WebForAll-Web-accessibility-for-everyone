@@ -59,17 +59,14 @@ const Navbar = () => {
   // Navigation items - different based on login status
   const navItems = isLoggedIn 
     ? [
-        { text: 'Guidelines', icon: 'GuidelinesIcon', path: '#' },
-        { text: 'About', icon: 'InfoIcon', path: '#' },
+        { text: 'Dashboard', icon: 'DashboardIcon', path: '/dashboard/home' },
+        { text: 'History', icon: 'HistoryIcon', path: '/dashboard/history' },
       ]
-    : [
-        { text: 'Guidelines', icon: 'GuidelinesIcon', path: '#' },
-        { text: 'About', icon: 'InfoIcon', path: '#' },
-      ];
+    : [];
 
   // Theme-based colors
   const COLORS = {
-    background: theme.palette.background.paper,
+    background: theme.palette.background.default,
     border: theme.palette.divider,
     text: theme.palette.text.primary,
     lightText: theme.palette.text.secondary,
@@ -82,12 +79,11 @@ const Navbar = () => {
     <>
       <AppBar 
         position="fixed" 
-        elevation={1} 
+        elevation={0} 
         sx={{ 
           bgcolor: COLORS.background,
           color: COLORS.text,
-          zIndex: theme.zIndex.drawer + 2,
-          borderBottom: `1px solid ${COLORS.border}`
+          zIndex: theme.zIndex.drawer + 2
         }}
       >
         <Toolbar>

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
-import UploadCard from '../components/UploadCard';
-import ResultCard from '../components/ResultCard';
-import { Box, Typography, Paper, CircularProgress, Alert, AlertTitle, Container, useTheme } from '@mui/material';
+import { Box, Typography, Paper, CircularProgress, Alert, AlertTitle, Container, useTheme, Button } from '@mui/material';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+
 
 // API base URL from environment or default to localhost
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -18,6 +20,8 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const theme = useTheme();
+  const navigate = useNavigate();
+  const {demoLogin} = useAuth();
 
   /**
    * Handles analysis results from any source
@@ -32,6 +36,11 @@ const Home = () => {
     };
     
     setResult(formattedResult);
+  };
+
+  const handleDemoLogin = () => {
+    demoLogin();
+    navigate('/dashboard/home');
   };
 
   /**
@@ -53,181 +62,395 @@ const Home = () => {
     >
       <Navbar />
       
-      {/* Hero Section */}
-      <Box 
-        sx={{ 
-          py: 6, 
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          px: 3,
-          width: '100%',
-        }}
-      >
-        <Typography 
-          variant="h2" 
-          component="h1" 
-          sx={{ 
-            fontWeight: 700, 
-            mb: 2,
-            color: theme.palette.text.primary,
-          }}
-        >
-          Accessibility Analyzer
-        </Typography>
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            maxWidth: 800, 
-            mb: 3,
-            fontWeight: 400,
-            color: theme.palette.text.secondary,
-          }}
-        >
-          Analyze your HTML code for accessibility issues and get recommendations to improve inclusivity
-        </Typography>
-        
+      {/* Top Tagline Section */}
+      <Box sx={{ 
+        display: 'flex',
+        justifyContent: 'center',
+        width: '100%',
+        py: 8
+      }}>
         <Box sx={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          justifyContent: 'center', 
-          gap: 3, 
-          maxWidth: 900,
-          mb: 5
+          width: '100%', 
+          textAlign: 'center',
+          py: 3,
+          px: 4,
+          bgcolor: 'rgba(0,0,0,0.0)',
+          borderRadius: 3,
+          border: '1px solid rgba(0,0,0,0)'
         }}>
-          <Paper 
-            elevation={1} 
+          <Typography 
+            variant="h3" 
             sx={{ 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(67, 97, 238, 0.05)',
-              border: '1px solid rgba(67, 97, 238, 0.1)',
-              flex: '1 1 250px',
-              maxWidth: '280px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center'
+              color: theme.palette.text.secondary,
+              fontWeight: 500,
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontSize: { xs: '1.6rem', md: '2.0rem' },
+              lineHeight: 1,
+              maxWidth: '1000px',
+              mx: 'auto'
             }}
           >
-            <Box 
-              component="img" 
-              src="/ai-explain.svg" 
-              alt="" 
-              sx={{ height: 60, mb: 1, opacity: 0.9 }}
-              onError={(e) => {
-                e.target.style.display = 'none';
+            Analyze website accessibility with AI-powered insights{' '}
+            <br />
+            and recommendations for free
+          </Typography>
+        </Box>
+      </Box>
+      
+      {/* Feature Boxes Section - At Top, Full Width, 2 per Row */}
+      <Container maxWidth="xl" sx={{ py: 0 }}>
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, 
+          gap: 2, 
+          mb: 4
+        }}>
+        
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 4, 
+              borderRadius: 4, 
+              bgcolor: theme.palette.background.paper,
+              background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.05) 0%, rgba(67, 97, 238, 0.02) 100%)',
+              border: '1px solid rgba(67, 97, 238, 0.1)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 20px 40px rgba(67, 97, 238, 0.15)',
+                background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.08) 0%, rgba(67, 97, 238, 0.04) 100%)',
+                border: '1px solid rgba(67, 97, 238, 0.2)',
+                '& .feature-icon': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                },
+                '& .feature-title': {
+                  color: theme.palette.primary.main,
+                }
+              },
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                opacity: 0,
+                transition: 'opacity 0.3s ease',
+              },
+              '&:hover::before': {
+                opacity: 1,
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography 
+                className="feature-icon"
+                variant="h3" 
+                sx={{ 
+                  mr: 2, 
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  filter: 'drop-shadow(0 2px 4px rgba(67, 97, 238, 0.2))'
+                }}
+              >
+                🔍
+              </Typography>
+              <Typography 
+                className="feature-title"
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 700, 
+                  color: theme.palette.text.primary,
+                  transition: 'color 0.3s ease',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                Comprehensive Analysis
+              </Typography>
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                whiteSpace: 'pre-line',
+                lineHeight: 1.6,
+                fontSize: '1rem',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
-            />
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-              AI Explanations
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Get AI-powered explanations for accessibility issues with step-by-step fixes and code examples
+            >
+              • Dynamic analysis using axe-core (100+ rules)\n• WCAG 2.0, 2.1, 2.2 compliance checking\n• Multiple input methods (URL, HTML file, paste)\n• Real-time JavaScript-rendered content analysis
             </Typography>
           </Paper>
           
           <Paper 
-            elevation={1} 
+            elevation={3} 
             sx={{ 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(67, 97, 238, 0.05)',
+              p: 4, 
+              borderRadius: 4, 
+              bgcolor: theme.palette.background.paper,
+              background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.05) 0%, rgba(67, 97, 238, 0.02) 100%)',
               border: '1px solid rgba(67, 97, 238, 0.1)',
-              flex: '1 1 250px',
-              maxWidth: '280px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 20px 40px rgba(67, 97, 238, 0.15)',
+                background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.08) 0%, rgba(67, 97, 238, 0.04) 100%)',
+                border: '1px solid rgba(67, 97, 238, 0.2)',
+                '& .feature-icon': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                },
+                '& .feature-title': {
+                  color: theme.palette.primary.main,
+                }
+              },
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                opacity: 0,
+                transition: 'opacity 0.3s ease',
+              },
+              '&:hover::before': {
+                opacity: 1,
+              }
             }}
           >
-            <Box 
-              component="img" 
-              src="/ai-chat.svg" 
-              alt="" 
-              sx={{ height: 60, mb: 1, opacity: 0.9 }}
-              onError={(e) => {
-                e.target.style.display = 'none';
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography 
+                className="feature-icon"
+                variant="h3" 
+                sx={{ 
+                  mr: 2, 
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  filter: 'drop-shadow(0 2px 4px rgba(67, 97, 238, 0.2))'
+                }}
+              >
+                🤖
+              </Typography>
+              <Typography 
+                className="feature-title"
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 700, 
+                  color: theme.palette.text.primary,
+                  transition: 'color 0.3s ease',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                AI-Powered Insights
+              </Typography>
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                whiteSpace: 'pre-line',
+                lineHeight: 1.6,
+                fontSize: '1rem',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
-            />
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-              AI Assistant
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Chat with our AI assistant to learn about accessibility best practices and WCAG guidelines
+            >
+              • Google Gemini AI explanations\n• Step-by-step fix instructions\n• Code examples and best practices\n• Interactive chatbot assistance
             </Typography>
           </Paper>
           
           <Paper 
-            elevation={1} 
+            elevation={3} 
             sx={{ 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(67, 97, 238, 0.05)',
+              p: 4, 
+              borderRadius: 4, 
+              bgcolor: theme.palette.background.paper,
+              background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.05) 0%, rgba(67, 97, 238, 0.02) 100%)',
               border: '1px solid rgba(67, 97, 238, 0.1)',
-              flex: '1 1 250px',
-              maxWidth: '280px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 20px 40px rgba(67, 97, 238, 0.15)',
+                background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.08) 0%, rgba(67, 97, 238, 0.04) 100%)',
+                border: '1px solid rgba(67, 97, 238, 0.2)',
+                '& .feature-icon': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                },
+                '& .feature-title': {
+                  color: theme.palette.primary.main,
+                }
+              },
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                opacity: 0,
+                transition: 'opacity 0.3s ease',
+              },
+              '&:hover::before': {
+                opacity: 1,
+              }
             }}
           >
-            <Box 
-              component="img" 
-              src="/ai-summary.svg" 
-              alt="" 
-              sx={{ height: 60, mb: 1, opacity: 0.9 }}
-              onError={(e) => {
-                e.target.style.display = 'none';
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography 
+                className="feature-icon"
+                variant="h3" 
+                sx={{ 
+                  mr: 2, 
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  filter: 'drop-shadow(0 2px 4px rgba(67, 97, 238, 0.2))'
+                }}
+              >
+                📊
+              </Typography>
+              <Typography 
+                className="feature-title"
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 700, 
+                  color: theme.palette.text.primary,
+                  transition: 'color 0.3s ease',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                Detailed Reporting
+              </Typography>
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                whiteSpace: 'pre-line',
+                lineHeight: 1.6,
+                fontSize: '1rem',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
-            />
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-              AI Summary Reports
+            >
+              • Accessibility scores and breakdowns\n• Severity-based issue categorization\n• PDF export with professional formatting\n• Executive summaries and recommendations
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Generate comprehensive accessibility reports with prioritized recommendations and impact analysis
+          </Paper>
+          
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 4, 
+              borderRadius: 4, 
+              bgcolor: theme.palette.background.paper,
+              background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.05) 0%, rgba(67, 97, 238, 0.02) 100%)',
+              border: '1px solid rgba(67, 97, 238, 0.1)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 20px 40px rgba(67, 97, 238, 0.15)',
+                background: 'linear-gradient(135deg, rgba(67, 97, 238, 0.08) 0%, rgba(67, 97, 238, 0.04) 100%)',
+                border: '1px solid rgba(67, 97, 238, 0.2)',
+                '& .feature-icon': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                },
+                '& .feature-title': {
+                  color: theme.palette.primary.main,
+                }
+              },
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                opacity: 0,
+                transition: 'opacity 0.3s ease',
+              },
+              '&:hover::before': {
+                opacity: 1,
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography 
+                className="feature-icon"
+                variant="h3" 
+                sx={{ 
+                  mr: 2, 
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  filter: 'drop-shadow(0 2px 4px rgba(67, 97, 238, 0.2))'
+                }}
+              >
+                💾
+              </Typography>
+              <Typography 
+                className="feature-title"
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 700, 
+                  color: theme.palette.text.primary,
+                  transition: 'color 0.3s ease',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                History & Tracking
+              </Typography>
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                whiteSpace: 'pre-line',
+                lineHeight: 1.6,
+                fontSize: '1rem',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+              }}
+            >
+              • Save and organize analysis results\n• Track improvements over time\n• Compare different versions\n• Quick access to previous reports
             </Typography>
           </Paper>
         </Box>
-      </Box>
-
-      {/* Main Content */}
-      <Container maxWidth="xl" sx={{ flex: 1, mb: 6 }}>
-        {/* Upload/Paste Component - Default to URL tab (index 0) */}
-        <UploadCard 
-          onAnalyze={handleAnalysisResult} 
-          defaultTab={0} 
-          isLoading={loading}
-          setIsLoading={setLoading}
-          onError={setError}
-          clearError={clearError}
-        />
         
-        {/* Loading State */}
-        {loading && (
-          <Paper elevation={3} sx={{ width: '100%', mt: 3, borderRadius: 3, p: 4, bgcolor: theme.palette.background.paper }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, py: 6 }}>
-              <CircularProgress />
-              <Typography variant="body1" color={theme.palette.text.secondary}>
-                Analyzing your content...
-              </Typography>
-            </Box>
-          </Paper>
-        )}
-        
-        {/* Error State */}
-        {error && (
-          <Alert severity="error" sx={{ width: '100%', mt: 3 }}>
-            <AlertTitle>Analysis Failed</AlertTitle>
-            {error}
-          </Alert>
-        )}
-        
-        {/* Results Display */}
-        <ResultCard result={result} />
+        {/* Big Demo User Button */}
+        <Box sx={{ 
+          textAlign: 'center',
+          mb: 4
+        }}>
+            <Button 
+              variant="contained" 
+              size="large"
+              sx={{ 
+                bgcolor: theme.palette.primary.main,
+                color: 'white',
+                px: 6, 
+                py: 2,
+                fontSize: '1.2rem',
+                fontWeight: 'bold',
+                textTransform: 'none',
+                borderRadius: 3,
+                boxShadow: '0 4px 12px rgba(67, 97, 238, 0.3)',
+                '&:hover': {
+                  bgcolor: theme.palette.primary.dark,
+                  boxShadow: '0 6px 16px rgba(67, 97, 238, 0.4)'
+                }
+              }}
+              onClick={handleDemoLogin}
+            >
+              Continue as Demo User
+            </Button>
+        </Box>
       </Container>
     </Box>
   );
