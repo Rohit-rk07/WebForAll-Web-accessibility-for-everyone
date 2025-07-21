@@ -50,7 +50,7 @@ const ResultCard = ({ result }) => {
   };
   
   // Debug output to console
-  console.log('Analysis result:', result);
+
 
   // Extract violations from results (handle different API response structures)
   let violations = [];

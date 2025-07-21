@@ -20,7 +20,9 @@ import {
   Block,
   Code,
   SmartToy,
-  WarningAmber
+  WarningAmber,
+  ErrorOutline,
+  InfoOutlined
 } from '@mui/icons-material';
 import ViolationItem from './ViolationItem';
 import { extractAxeResults, getNormalizedSeverity, getSeverityConfig } from '../../utils/resultsUtils';
@@ -36,6 +38,7 @@ const ResultsContent = ({
   theme 
 }) => {
   const [needsReviewLoading, setNeedsReviewLoading] = useState({});
+  const [needsReviewResponse, setNeedsReviewResponse] = useState({});
 
   // Get severity configuration
   const icons = {
@@ -53,11 +56,17 @@ const ResultsContent = ({
     setNeedsReviewLoading(prev => ({ ...prev, [index]: true }));
     
     try {
-      const response = await aiService.explainIssue(issue);
-      // Handle the response - could show in a dialog or popover
-      console.log('Needs Review response:', response);
+      const response = await aiService.getIssueExplanation(issue);
+      setNeedsReviewResponse(prev => ({ ...prev, [index]: response }));
     } catch (error) {
       console.error('Error getting needs review:', error);
+      setNeedsReviewResponse(prev => ({ 
+        ...prev, 
+        [index]: {
+          explanation: 'Unable to get AI suggestion at this time.',
+          fix: 'Please refer to the issue description for guidance.'
+        }
+      }));
     } finally {
       setNeedsReviewLoading(prev => ({ ...prev, [index]: false }));
     }
@@ -284,13 +293,35 @@ const ResultsContent = ({
                   </List>
                 </Box>
               )}
-              
-              {issue.helpUrl && (
-                <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                  Learn more about this rule
-                </Typography>
-              )}
-            </AccordionDetails>
+               
+               {/* AI Response Display */}
+               {needsReviewResponse[index] && (
+                 <Box sx={{ mt: 3, p: 2, backgroundColor: theme.palette.background.default, borderRadius: 1 }}>
+                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: theme.palette.primary.main }}>
+                     🤖 AI Suggestion
+                   </Typography>
+                   <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
+                     {needsReviewResponse[index].explanation}
+                   </Typography>
+                   {needsReviewResponse[index].fix && (
+                     <Box>
+                       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                         💡 How to Fix
+                       </Typography>
+                       <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                         {needsReviewResponse[index].fix}
+                       </Typography>
+                     </Box>
+                   )}
+                 </Box>
+               )}
+               
+               {issue.helpUrl && (
+                 <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
+                   Learn more about this rule
+                 </Typography>
+               )}
+             </AccordionDetails>
           </Accordion>
         ))}
       </Box>
@@ -332,14 +363,14 @@ const ResultsContent = ({
               mb: 2,
               '&:before': { display: 'none' },
               boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.grey[300]}`
+              border: `1px solid ${theme.palette.divider}`
             }}
           >
             <AccordionSummary 
               expandIcon={<ExpandMore />}
               sx={{ 
-                backgroundColor: theme.palette.grey[50],
-                '&:hover': { backgroundColor: theme.palette.grey[100] }
+                backgroundColor: theme.palette.action.hover,
+                '&:hover': { backgroundColor: theme.palette.action.selected }
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>

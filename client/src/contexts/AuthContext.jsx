@@ -63,7 +63,7 @@ export const AuthProvider = ({ children, value }) => {
       formData.append('username', email); // OAuth2 uses 'username' field
       formData.append('password', password);
 
-      console.log('Attempting login with:', { email });
+
       
       const response = await fetch(`${API_BASE_URL}/token`, {
         method: 'POST',

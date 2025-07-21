@@ -45,43 +45,40 @@ export const getNormalizedSeverity = (issue) => {
 };
 
 /**
- * Calculate accessibility score based on violations
+ * Calculate accessibility score based on violations and passes
  * @param {Object} resultData - Analysis result data
  * @returns {Object} Score data with percentage and breakdown
  */
 export const calculateAccessibilityScore = (resultData) => {
-  // Extract violations using standardized utility
+  // Extract violations and passes using standardized utility
   const violations = extractAxeResults(resultData, 'violations');
+  const passes = extractAxeResults(resultData, 'passes');
   
   // Calculate severity breakdown for violations using standardized mapping
   const severityCounts = violations.reduce((acc, issue) => {
     const severity = getNormalizedSeverity(issue);
-    
-    if (severity === 'critical') {
-      acc.critical++;
-    } else if (severity === 'serious') {
-      acc.serious++;
-    } else if (severity === 'moderate') {
-      acc.moderate++;
-    } else {
-      acc.minor++;
-    }
+    acc[severity]++;
     return acc;
   }, { critical: 0, serious: 0, moderate: 0, minor: 0 });
-
-  // Calculate weighted score (critical issues have more impact)
+  
   const totalIssues = violations.length;
-  const weightedScore = totalIssues === 0 ? 100 : Math.max(0, 
-    100 - (
-      (severityCounts.critical * 25) + 
-      (severityCounts.serious * 15) + 
-      (severityCounts.moderate * 8) + 
-      (severityCounts.minor * 3)
-    )
+  
+  // Calculate score using OLD method (100 - deductions)
+  // Critical: -5 points each
+  // Serious: -2 points each  
+  // Moderate: -1 point each
+  // Minor: -0.5 points each
+  const deduction = (
+    severityCounts.critical * 5 +
+    severityCounts.serious * 2 +
+    severityCounts.moderate * 1 +
+    severityCounts.minor * 0.5
   );
-
+  
+  const score = Math.max(0, Math.min(100, 100 - deduction));
+  
   return {
-    score: Math.round(weightedScore),
+    score: Math.round(score),
     totalIssues,
     severityCounts
   };

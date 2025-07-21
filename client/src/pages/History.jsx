@@ -104,7 +104,7 @@ const History = () => {
   // Handle view report
   const handleViewReport = (report) => {
     // In a real app, this would navigate to the results page with the report data
-    console.log('Viewing report:', report);
+
     // navigate('/dashboard/results', { state: { result: report } });
   };
 

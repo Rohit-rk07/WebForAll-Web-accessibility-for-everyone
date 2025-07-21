@@ -7,6 +7,10 @@ import uuid
 import json
 from datetime import timedelta
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -22,11 +26,10 @@ from auth import (
 from services import (
     send_welcome_email, send_password_reset_email,
     initialize_gemini, chat_completion, explain_accessibility_issue,
-    generate_accessibility_summary
 )
 from models import (
     URLAnalysisRequest, HTMLAnalysisRequest, ChatCompletionRequest,
-    ExplainRequest, SummaryRequest
+    ExplainRequest
 )
 
 # Analysis import (keeping the existing dynamic analysis)
@@ -354,19 +357,6 @@ async def ai_explain_issue(request: ExplainRequest):
         return response
     except Exception as e:
         logger.error(f"AI explain error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI service error: {str(e)}"
-        )
-
-@app.post("/ai/summary", tags=["AI"])
-async def ai_generate_summary(request: SummaryRequest):
-    """Generate a summary report of accessibility issues."""
-    try:
-        summary = generate_accessibility_summary(request.results)
-        return {"summary": summary}
-    except Exception as e:
-        logger.error(f"AI summary error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI service error: {str(e)}"

@@ -74,19 +74,13 @@ const Signup = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('Attempting registration with:', { 
-        email, 
-        fullName,
-        password: '******'
-      });
-      
       await register({ 
         email, 
         fullName,
         password
       });
       
-      console.log('Registration successful, redirecting to dashboard');
+
     navigate('/dashboard/home');
     } catch (err) {
       console.error('Registration error:', err);

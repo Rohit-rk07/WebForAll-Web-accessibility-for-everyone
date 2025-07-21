@@ -14,7 +14,10 @@ import {
   Popover,
   Paper,
   IconButton,
-  Tooltip
+  Tooltip,
+  Divider,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import {
   ExpandMore,
@@ -24,7 +27,11 @@ import {
   Code,
   SmartToy,
   Close,
-  ContentCopy
+  ContentCopy,
+  Chat,
+  Psychology,
+  CheckCircle,
+  HelpOutline
 } from '@mui/icons-material';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -41,30 +48,45 @@ const ViolationItem = ({
   severityMap, 
   theme 
 }) => {
-  const [aiSuggestionAnchor, setAiSuggestionAnchor] = useState(null);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [loadingAiSuggestion, setLoadingAiSuggestion] = useState(false);
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const severity = getNormalizedSeverity(issue);
   const severityConfig = severityMap[severity] || severityMap.minor;
 
+  // Don't show AI suggestion for incomplete issues
+  const isIncomplete = issue.incomplete === true;
+
   /**
-   * Handle AI Suggestion click
+   * Handle AI Fix click
    */
-  const handleAiSuggestionClick = async (event) => {
-    setAiSuggestionAnchor(event.currentTarget);
+  const handleAiFixClick = async (event) => {
+    // Prevent accordion from closing when clicking AI Fix button
+    event.stopPropagation();
+    
+    // Expand the accordion if not already expanded
+    if (!isExpanded) {
+      setIsExpanded(true);
+    }
+    
+    if (showAiSuggestion && aiSuggestion) {
+      setShowAiSuggestion(false);
+      return;
+    }
+
     setLoadingAiSuggestion(true);
+    setShowAiSuggestion(true);
     
     try {
-      const response = await aiService.explainIssue(issue);
+      const response = await aiService.getIssueExplanation(issue);
       setAiSuggestion(response);
     } catch (error) {
       console.error('Error getting AI suggestion:', error);
       setAiSuggestion({
-        explanation: 'Unable to get AI suggestion at this time.',
-        fix: 'Please refer to the issue description and help text for guidance.',
-        beforeCode: issue.nodes?.[0]?.html || 'No code available',
-        afterCode: 'AI suggestion unavailable'
+        fixedCode: 'Unable to generate fixed code at this time.',
+        explanation: 'Unable to get AI suggestion. Please try again later.'
       });
     } finally {
       setLoadingAiSuggestion(false);
@@ -72,25 +94,55 @@ const ViolationItem = ({
   };
 
   /**
-   * Close AI Suggestion popover
+   * Handle accordion change
    */
-  const handleCloseAiSuggestion = () => {
-    setAiSuggestionAnchor(null);
-    setAiSuggestion(null);
+  const handleAccordionChange = (event, expanded) => {
+    setIsExpanded(expanded);
   };
 
   /**
    * Continue in chat
    */
   const handleContinueInChat = () => {
-    const htmlCode = issue.nodes?.[0]?.html || 'No HTML code available';
+    const htmlCode = issue.nodes?.[0]?.html || issue.element || 'No HTML code available';
     
+    // Clean and format the HTML code for better readability (more careful approach)
+    const cleanHtmlCode = htmlCode
+      .replace(/\s+/g, ' ')  // Replace multiple spaces/newlines with single space
+      .replace(/>\s+</g, '>\n<')  // Add newlines between tags for readability
+      .replace(/\s+>/g, '>')  // Remove spaces before closing >
+      .replace(/<\s+/g, '<')  // Remove spaces after opening <
+      .trim();
+    
+    const chatMessage = `I need help with this accessibility issue:
+
+**Issue:** ${issue.help || issue.description || 'Accessibility Issue'}
+**Rule ID:** ${issue.id}
+**Impact:** ${issue.impact || 'Unknown'}
+
+**Current HTML Code:**
+\`\`\`html
+${cleanHtmlCode}
+\`\`\`
+
+${aiSuggestion ? `**AI Suggestion:**
+${aiSuggestion.explanation}
+
+**Fixed Code:**
+\`\`\`html
+${aiSuggestion.fixedCode}
+\`\`\`
+
+` : ''}Can you help me understand this accessibility issue better and provide additional guidance for fixing it?`;
+    
+    // Open chat with context using global method
     if (window.openAiChatWithContext) {
-      window.openAiChatWithContext(
-        `I need help with this accessibility issue: ${issue.help || issue.description}. Here's the HTML code: ${htmlCode}`
-      );
+      window.openAiChatWithContext(chatMessage);
+    } else if (window.aiChatbot) {
+      window.aiChatbot.addContextMessage(chatMessage);
+    } else {
+      console.warn('Chat functionality not available');
     }
-    handleCloseAiSuggestion();
   };
 
   /**
@@ -99,253 +151,228 @@ const ViolationItem = ({
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
       // Could show a toast notification here
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
     });
   };
 
   return (
     <Accordion 
       key={`violation-${index}`}
+      expanded={isExpanded}
+      onChange={handleAccordionChange}
+      elevation={0}
       sx={{ 
         mb: 2,
-        '&:before': { display: 'none' },
-        boxShadow: theme.shadows[2],
-        border: `1px solid ${theme.palette.divider}`
+        border: `1px solid ${theme.palette.divider}`,
+        borderLeft: `4px solid ${severityConfig.color === 'error' ? theme.palette.error.main : theme.palette.warning.main}`,
+        borderRadius: 1,
+        '&:before': { display: 'none' }
       }}
     >
       <AccordionSummary 
         expandIcon={<ExpandMore />}
         sx={{ 
-          backgroundColor: theme.palette.background.default,
-          '&:hover': { backgroundColor: theme.palette.action.hover }
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-          {severityConfig.icon}
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-              {issue.id || 'Unknown Rule'}
-            </Typography>
-            <Chip 
-              label={severity.charAt(0).toUpperCase() + severity.slice(1)} 
-              color={severityConfig.color} 
-              size="small" 
-              sx={{ mt: 0.5 }}
-            />
-          </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<SmartToy />}
-            onClick={handleAiSuggestionClick}
-            sx={{ mr: 1 }}
-          >
-            AI Suggestion
-          </Button>
-        </Box>
-      </AccordionSummary>
-      
-      <AccordionDetails sx={{ pt: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Issue Description */}
-          <Box>
-            <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
-              {issue.help || issue.description || 'No description available'}
-            </Typography>
-            {issue.helpUrl && (
-              <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                Learn more about this rule
-              </Typography>
-            )}
-          </Box>
-
-          {/* Affected Elements */}
-          {issue.nodes && issue.nodes.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>
-                Affected Elements ({issue.nodes.length})
-              </Typography>
-              <List dense>
-                {issue.nodes.slice(0, 3).map((node, nodeIndex) => (
-                  <ListItem key={nodeIndex} sx={{ pl: 0 }}>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <Code fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography 
-                            variant="body2" 
-                            component="code"
-                            sx={{ 
-                              backgroundColor: theme.palette.background.default,
-                              padding: '2px 6px',
-                              borderRadius: 1,
-                              fontFamily: 'monospace',
-                              fontSize: '0.875rem',
-                              maxWidth: '70%',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {node.html || 'No HTML available'}
-                          </Typography>
-                          <Tooltip title="Copy HTML">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => copyToClipboard(node.html || '')}
-                            >
-                              <ContentCopy fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      }
-                      secondary={node.target ? `Selector: ${node.target.join(', ')}` : null}
-                    />
-                  </ListItem>
-                ))}
-                {issue.nodes.length > 3 && (
-                  <ListItem sx={{ pl: 0 }}>
-                    <ListItemText
-                      primary={
-                        <Typography variant="body2" color="text.secondary">
-                          ... and {issue.nodes.length - 3} more elements
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                )}
-              </List>
-            </Box>
-          )}
-        </Box>
-      </AccordionDetails>
-
-      {/* AI Suggestion Popover */}
-      <Popover
-        open={Boolean(aiSuggestionAnchor)}
-        anchorEl={aiSuggestionAnchor}
-        onClose={handleCloseAiSuggestion}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'center',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
-        }}
-        PaperProps={{
-          sx: { 
-            maxWidth: 800, 
-            width: '90vw',
-            maxHeight: '80vh',
-            overflow: 'auto'
+          bgcolor: theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.02)' 
+            : 'rgba(0, 0, 0, 0.02)',
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          '&:hover': {
+            bgcolor: theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.04)' 
+              : 'rgba(0, 0, 0, 0.04)'
           }
         }}
       >
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">AI Suggestion</Typography>
-            <IconButton onClick={handleCloseAiSuggestion} size="small">
-              <Close />
-            </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Typography variant="subtitle1" fontWeight="medium" color="text.primary">
+            {issue.id || issue.rule || 'Unknown Rule'}
+          </Typography>
+          <Chip 
+            label={issue.impact || severity}
+            size="small"
+            color={severityConfig.color}
+            sx={{ ml: 2 }}
+          />
+          {!isIncomplete && (
+            <Button
+              startIcon={<SmartToy />}
+              variant="outlined"
+              size="small"
+              color={showAiSuggestion ? "primary" : "primary"}
+              onClick={handleAiFixClick}
+              sx={{ 
+                ml: 'auto', 
+                minWidth: 120
+              }}
+            >
+              {showAiSuggestion ? 'Hide AI Fix' : 'AI Fix'}
+            </Button>
+          )}
+        </Box>
+      </AccordionSummary>
+      
+      <AccordionDetails sx={{ p: 3 }}>
+        {/* Issue Description */}
+        {(issue.description || issue.help) && (
+          <Box sx={{ mb: 2 }} className="issue-details">
+            <Typography variant="body1" gutterBottom>
+              {issue.description || issue.help}
+            </Typography>
           </Box>
-          
-          {loadingAiSuggestion ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <Typography>Getting AI suggestion...</Typography>
+        )}
+        
+        {/* Help URL */}
+        {issue.helpUrl && (
+          <Box sx={{ mb: 2 }}>
+            <Button 
+              href={issue.helpUrl} 
+              target="_blank"
+              rel="noopener noreferrer"
+              startIcon={<HelpOutline />}
+              size="small"
+              variant="text"
+            >
+              Learn more about this issue
+            </Button>
+          </Box>
+        )}
+
+        {/* AI Suggestion Section - Only show for violations, not incomplete */}
+        {!isIncomplete && showAiSuggestion && (
+          <Box sx={{ 
+            mb: 3, 
+            p: 2, 
+            backgroundColor: theme.palette.mode === 'dark'
+              ? theme.palette.primary.dark + '20'
+              : theme.palette.primary.light + '10',
+            borderRadius: 2,
+            border: `1px solid ${theme.palette.primary.main}40`
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <SmartToy sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+                🤖 AI Fix
+              </Typography>
             </Box>
-          ) : aiSuggestion && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Explanation */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                  Explanation
+
+            {loadingAiSuggestion ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  Getting AI fix...
                 </Typography>
-                <Typography variant="body2" sx={{ mb: 2 }}>
+              </Box>
+            ) : aiSuggestion ? (
+              <Box>
+                {/* Explanation */}
+                <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic' }}>
                   {aiSuggestion.explanation}
                 </Typography>
-              </Box>
 
-              {/* Before/After Code */}
-              {aiSuggestion.beforeCode && aiSuggestion.afterCode && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Code Comparison
-                  </Typography>
-                  
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-                    <Box>
-                      <Typography variant="caption" color="error" sx={{ fontWeight: 'bold' }}>
-                        Before (Current)
-                      </Typography>
-                      <SyntaxHighlighter
-                        language="html"
-                        style={tomorrow}
-                        customStyle={{
-                          fontSize: '12px',
-                          maxHeight: '200px',
-                          margin: 0,
-                          borderRadius: '4px'
-                        }}
-                      >
-                        {aiSuggestion.beforeCode}
-                      </SyntaxHighlighter>
-                    </Box>
-                    
-                    <Box>
-                      <Typography variant="caption" color="success.main" sx={{ fontWeight: 'bold' }}>
-                        After (Fixed)
-                      </Typography>
-                      <SyntaxHighlighter
-                        language="html"
-                        style={tomorrow}
-                        customStyle={{
-                          fontSize: '12px',
-                          maxHeight: '200px',
-                          margin: 0,
-                          borderRadius: '4px'
-                        }}
-                      >
-                        {aiSuggestion.afterCode}
-                      </SyntaxHighlighter>
-                    </Box>
+                {/* Fixed Code */}
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="caption" sx={{ 
+                      fontWeight: 'bold', 
+                      color: theme.palette.success.main 
+                    }}>
+                      ✅ Fixed Code
+                    </Typography>
+                    <Tooltip title="Copy to clipboard">
+                      <IconButton size="small" onClick={() => copyToClipboard(aiSuggestion.fixedCode)}>
+                        <ContentCopy fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Box 
+                    sx={{ 
+                      bgcolor: theme.palette.mode === 'dark'
+                        ? theme.palette.grey[900]
+                        : theme.palette.grey[100], 
+                      p: 1.5, 
+                      borderRadius: 1,
+                      overflowX: 'auto',
+                      border: `1px solid ${theme.palette.divider}`
+                    }}
+                    className="code-snippet"
+                  >
+                    <Typography 
+                      variant="body2" 
+                      component="pre" 
+                      sx={{ 
+                        fontFamily: 'monospace', 
+                        m: 0,
+                        fontSize: '0.85rem',
+                        color: 'text.primary',
+                        display: 'block'
+                      }}
+                    >
+                      {aiSuggestion.fixedCode}
+                    </Typography>
                   </Box>
                 </Box>
-              )}
 
-              {/* Fix Instructions */}
-              {aiSuggestion.fix && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    How to Fix
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    {aiSuggestion.fix}
-                  </Typography>
+                {/* Action Button */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Chat />}
+                    onClick={handleContinueInChat}
+                  >
+                    Continue in Chat
+                  </Button>
                 </Box>
-              )}
-
-              {/* Action Buttons */}
-              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleContinueInChat}
-                  startIcon={<SmartToy />}
-                >
-                  Continue in Chat
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleCloseAiSuggestion}
-                >
-                  Close
-                </Button>
               </Box>
-            </Box>
-          )}
-        </Paper>
-      </Popover>
+            ) : (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                <Typography variant="body2">
+                  Unable to get AI suggestion at this time.
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        )}
+        
+        {/* Affected Elements - Original Format */}
+        {issue.nodes && issue.nodes.length > 0 && (
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Affected Elements ({issue.nodes.length})
+            </Typography>
+            
+            {issue.nodes.map((node, nodeIndex) => (
+              <Box 
+                key={`node-${index}-${nodeIndex}`}
+                sx={{ 
+                  mb: 2,
+                  p: 2,
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? theme.palette.grey[900]
+                    : theme.palette.grey[100],
+                  borderRadius: 1,
+                  overflow: 'auto',
+                  border: `1px solid ${theme.palette.divider}`
+                }}
+                className="code-snippet"
+              >
+                <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', m: 0 }}>
+                  {node.html}
+                </Typography>
+                
+                {node.failureSummary && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="error">
+                      {node.failureSummary}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </AccordionDetails>
     </Accordion>
   );
 };

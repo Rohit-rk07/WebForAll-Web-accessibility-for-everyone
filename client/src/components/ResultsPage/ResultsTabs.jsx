@@ -3,8 +3,7 @@ import {
   Tabs,
   Tab,
   Box,
-  Typography,
-  Badge
+  Typography
 } from '@mui/material';
 import {
   ErrorOutline,
@@ -66,21 +65,7 @@ const ResultsTabs = ({
         {tabs.map((tab, index) => (
           <Tab
             key={index}
-            icon={
-              <Badge 
-                badgeContent={tab.count} 
-                color={tab.color}
-                max={999}
-                sx={{
-                  '& .MuiBadge-badge': {
-                    right: -8,
-                    top: -8
-                  }
-                }}
-              >
-                {tab.icon}
-              </Badge>
-            }
+            icon={tab.icon}
             label={
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>

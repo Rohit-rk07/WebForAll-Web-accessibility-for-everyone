@@ -175,44 +175,46 @@ const ScoreCard = ({
           </Box>
         </Grid>
 
-        {/* Test Results Summary */}
+        {/* Test Results Summary - Right Side */}
         <Grid item xs={12} md={4}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AccessibilityNew color="primary" />
-            Test Summary
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" color="error">
-                Violations
-              </Typography>
-              <Typography variant="body2" fontWeight="bold" color="error">
-                {resultCounts.violations}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" color="success.main">
-                Passes
-              </Typography>
-              <Typography variant="body2" fontWeight="bold" color="success.main">
-                {resultCounts.passes}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" color="warning.main">
-                Incomplete
-              </Typography>
-              <Typography variant="body2" fontWeight="bold" color="warning.main">
-                {resultCounts.incomplete}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Inapplicable
-              </Typography>
-              <Typography variant="body2" fontWeight="bold" color="text.secondary">
-                {resultCounts.inapplicable}
-              </Typography>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
+              <AccessibilityNew color="primary" />
+              Test Summary
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="error">
+                  Violations
+                </Typography>
+                <Typography variant="body2" fontWeight="bold" color="error">
+                  {resultCounts.violations}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="success.main">
+                  Passes
+                </Typography>
+                <Typography variant="body2" fontWeight="bold" color="success.main">
+                  {resultCounts.passes}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="warning.main">
+                  Incomplete
+                </Typography>
+                <Typography variant="body2" fontWeight="bold" color="warning.main">
+                  {resultCounts.incomplete}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Inapplicable
+                </Typography>
+                <Typography variant="body2" fontWeight="bold" color="text.secondary">
+                  {resultCounts.inapplicable}
+                </Typography>
+              </Box>
             </Box>
           </Box>
         </Grid>

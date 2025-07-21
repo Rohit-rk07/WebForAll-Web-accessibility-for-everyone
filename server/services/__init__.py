@@ -10,9 +10,7 @@ from .ai_service import (
     initialize_gemini,
     chat_completion,
     explain_accessibility_issue,
-    generate_accessibility_summary,
     generate_fallback_explanation,
-    generate_fallback_summary,
     GEMINI_CONFIGURED
 )
 
@@ -25,8 +23,6 @@ __all__ = [
     "initialize_gemini",
     "chat_completion",
     "explain_accessibility_issue",
-    "generate_accessibility_summary",
     "generate_fallback_explanation",
-    "generate_fallback_summary",
     "GEMINI_CONFIGURED"
 ]

@@ -14,7 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
  */
 export const getIssueExplanation = async (issue) => {
   try {
-    const response = await axios.post(`${API_URL}/api/chat/explain`, {
+    const response = await axios.post(`${API_URL}/ai/explain`, {
       issue: issue
     });
     // Handle both success and error responses from backend
@@ -44,7 +44,7 @@ export const getIssueExplanation = async (issue) => {
  */
 export const getResultsSummary = async (results) => {
   try {
-    const response = await axios.post(`${API_URL}/api/chat/summary`, {
+    const response = await axios.post(`${API_URL}/ai/summary`, {
       results: results
     });
     // Handle both success and error responses from backend
@@ -75,9 +75,9 @@ export const getResultsSummary = async (results) => {
  */
 export const sendChatMessage = async (messages, options = {}) => {
   try {
-    const response = await axios.post(`${API_URL}/api/chat/completion`, {
+    const response = await axios.post(`${API_URL}/ai/chat`, {
       messages: messages,
-      model: options.model || 'gemini-pro',
+      model: options.model || 'gemini-1.5-flash',
       temperature: options.temperature || 0.7,
       max_tokens: options.max_tokens
     });
@@ -103,6 +103,7 @@ export const sendChatMessage = async (messages, options = {}) => {
 
 export default {
   getIssueExplanation,
+  explainIssue: getIssueExplanation, // Alias for compatibility
   getResultsSummary,
   sendChatMessage
 };

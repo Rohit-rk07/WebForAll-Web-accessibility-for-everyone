@@ -6,11 +6,20 @@ import {
   Typography, 
   Button, 
   CircularProgress,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Fab,
+  Tooltip
 } from '@mui/material';
 import { 
   ArrowBack,
-  Download
+  Download,
+  Psychology,
+  Close,
+  SmartToy
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
@@ -25,6 +34,9 @@ import {
   calculateAccessibilityScore, 
   calculateResultCounts 
 } from '../utils/resultsUtils';
+
+// Import AI service
+import aiService from '../services/aiService';
 
 /**
  * Results Page component
@@ -44,7 +56,7 @@ const ResultsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const resultsRef = useRef(null);
-
+  
   useEffect(() => {
     // Get result from location state or redirect to dashboard
     if (location.state?.result) {
@@ -146,13 +158,15 @@ const ResultsPage = () => {
             Accessibility Analysis Results
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<Download />}
-          onClick={handleExportClick}
-        >
-          Export Results
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExportClick}
+          >
+            Export Results
+          </Button>
+        </Box>
       </Paper>
 
       {/* Main Content */}
@@ -167,11 +181,13 @@ const ResultsPage = () => {
         />
 
         {/* Results Navigation Tabs */}
-        <ResultsTabs
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          resultCounts={resultCounts}
-        />
+        <Box sx={{ mt: 4, mb: 3, pt: 2 }}>
+          <ResultsTabs
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            resultCounts={resultCounts}
+          />
+        </Box>
 
         {/* Results Content */}
         <ResultsContent
@@ -187,7 +203,6 @@ const ResultsPage = () => {
         onClose={handleCloseExportDialog}
         result={result}
         resultsRef={resultsRef}
-        setLoading={setLoading}
       />
     </Box>
   );

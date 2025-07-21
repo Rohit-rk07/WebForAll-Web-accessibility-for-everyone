@@ -9,10 +9,13 @@ import {
   CircularProgress,
   Tooltip
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   SmartToy,
   Close,
-  Send
+  Send,
+  Minimize,
+  Maximize
 } from '@mui/icons-material';
 import aiService from '../services/aiService';
 
@@ -21,20 +24,51 @@ import aiService from '../services/aiService';
  * Can be used across the app to provide AI assistance
  */
 const AiChatbot = () => {
+  const theme = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [chatWidth, setChatWidth] = useState(350);
+
   // Expose methods globally for other components to use
   useEffect(() => {
     window.aiChatbot = {
       open: () => setIsOpen(true),
       addContextMessage: (message) => {
-        setMessages(prev => [...prev, {
+        const userMessage = {
           role: 'user',
           content: message
-        }]);
+        };
+        
+        setMessages(prev => {
+          const newMessages = [...prev, userMessage];
+          
+          // Auto-send the message to get AI response
+          setIsLoading(true);
+          aiService.sendChatMessage(newMessages)
+            .then(response => {
+              const assistantMessage = {
+                role: 'assistant',
+                content: response.content
+              };
+              setMessages(current => [...current, assistantMessage]);
+            })
+            .catch(error => {
+              console.error('Error sending context message:', error);
+              const errorMessage = {
+                role: 'assistant',
+                content: error.message || `I'm currently experiencing technical difficulties. Please try again later.`
+              };
+              setMessages(current => [...current, errorMessage]);
+            })
+            .finally(() => {
+              setIsLoading(false);
+            });
+          
+          return newMessages;
+        });
+        
         setIsOpen(true);
       }
     };
@@ -49,7 +83,7 @@ const AiChatbot = () => {
     if (messages.length === 0) {
       setMessages([
         {
-          role: 'assistant',
+          role: '',
           content: 'Hello! I\'m your accessibility assistant. How can I help you understand or fix accessibility issues today?'
         }
       ]);
@@ -141,25 +175,46 @@ const AiChatbot = () => {
           position: 'fixed',
           top: 64,
           right: 0,
-          width: 350,
+          width: isOpen ? chatWidth : 0,
           height: 'calc(100vh - 64px)',
           bgcolor: 'background.paper',
           boxShadow: 3,
           zIndex: 1300,
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease-in-out',
+          transition: 'transform 0.3s ease-in-out, width 0.3s ease-in-out',
+          borderLeft: `1px solid ${theme.palette.divider}`,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          minWidth: isOpen ? 300 : 0,
+          maxWidth: '80vw'
         }}
       >
         {/* Header */}
-        <Box sx={{ p: 2, borderBottom: `1px solid`, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
-          <SmartToy sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>Accessibility AI Assistant</Typography>
-          <IconButton onClick={toggleChat} size="small">
-            <Close />
-          </IconButton>
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          bgcolor: theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SmartToy color="primary" />
+            AI Assistant
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title={chatWidth >= 600 ? "Minimize" : "Expand"}>
+              <IconButton 
+                size="small" 
+                onClick={() => setChatWidth(chatWidth >= 600 ? 350 : 1500)}
+              >
+                {chatWidth >= 600 ? <Minimize /> : <Maximize />}
+              </IconButton>
+            </Tooltip>
+            <IconButton size="small" onClick={toggleChat}>
+              <Close fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
 
         {/* Messages - This is the only part that should scroll */}
@@ -228,50 +283,23 @@ const AiChatbot = () => {
                           >
                             {language}
                           </Typography>
-                          <Box 
-                            component="pre" 
-                            sx={{ 
-                              bgcolor: '#f8f9fa', 
-                              p: 2, 
-                              borderRadius: 2, 
+                          <Box
+                            component="pre"
+                            sx={{
+                              bgcolor: theme.palette.mode === 'dark' ? '#23272f' : '#f8f9fa',
+                              p: 2,
+                              borderRadius: 2,
                               overflow: 'auto',
                               fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
                               fontSize: '0.875rem',
                               lineHeight: 1.5,
-                              border: '1px solid #e1e4e8',
-                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-                              m: 0,
-                              '& .hljs-tag': { color: '#22863a' },
-                              '& .hljs-name': { color: '#22863a' },
-                              '& .hljs-attr': { color: '#6f42c1' },
-                              '& .hljs-string': { color: '#032f62' },
-                              '& .hljs-keyword': { color: '#d73a49', fontWeight: 'bold' },
-                              '& .hljs-comment': { color: '#6a737d', fontStyle: 'italic' }
+                              border: `1px solid ${theme.palette.divider}`,
+                              m: 0
                             }}
                           >
-                            <code 
-                              style={{ 
-                                display: 'block',
-                                whiteSpace: 'pre',
-                                color: '#24292e'
-                              }}
-                              dangerouslySetInnerHTML={{ 
-                                __html: code
-                                  .replace(/&/g, '&amp;')
-                                  .replace(/</g, '&lt;')
-                                  .replace(/>/g, '&gt;')
-                                  // HTML tag highlighting
-                                  .replace(/(&lt;\/?)(\w+)/g, '<span class="hljs-tag">&lt;<span class="hljs-name">$2</span></span>')
-                                  .replace(/(&gt;)/g, '<span class="hljs-tag">&gt;</span>')
-                                  // Attribute highlighting
-                                  .replace(/(\w+)=/g, '<span class="hljs-attr">$1</span>=')
-                                  // String highlighting
-                                  .replace(/"([^"]*)"/g, '<span class="hljs-string">"$1"</span>')
-                                  .replace(/'([^']*)'/g, '<span class="hljs-string">\&#39;$1\&#39;</span>')
-                                  // Comment highlighting
-                                  .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="hljs-comment">$1</span>')
-                              }} 
-                            />
+                            <code>
+                              {code}
+                            </code>
                           </Box>
                         </Box>
                       );
@@ -330,4 +358,4 @@ const AiChatbot = () => {
   );
 };
 
-export default AiChatbot; 
+export default AiChatbot;
