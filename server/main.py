@@ -89,6 +89,9 @@ app.add_middleware(
 async def root():
     return {"status": "ok", "message": "WebForAll is running 🚀"}
 
+@app.get("/favicon.ico")
+async def favicon():
+    return {}
 
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
