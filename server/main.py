@@ -85,6 +85,11 @@ app.add_middleware(
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "WebForAll is running 🚀"}
+
+
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return access token."""
