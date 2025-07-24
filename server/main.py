@@ -400,12 +400,32 @@ def playwright_health_check():
         # Run a simple test analysis
         result = playwright_analyze_url(test_data["url"], test_data["wcag_options"])
         
+        # Additional debugging info
+        import subprocess
+        try:
+            # Check if playwright browsers are installed
+            browser_check = subprocess.run(["playwright", "install", "--dry-run"], 
+                                         capture_output=True, text=True, timeout=10)
+            browser_status = f"Exit code: {browser_check.returncode}, Output: {browser_check.stdout[:200]}"
+        except Exception as e:
+            browser_status = f"Browser check failed: {str(e)}"
+        
         return {
             "status": "healthy" if result.get("success") else "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
             "playwright_available": result.get("success", False),
             "error": result.get("error") if not result.get("success") else None,
             "browser_error": result.get("browser_error", False),
+            "navigation_error": result.get("navigation_error", False),
+            "axe_error": result.get("axe_error", False),
+            "analysis_error": result.get("analysis_error", False),
+            "violations_found": result.get("violations_count", 0),
+            "browser_status": browser_status,
+            "result_details": {
+                "success": result.get("success"),
+                "mode": result.get("mode"),
+                "tags_used": result.get("tags_used", [])
+            },
             "environment_vars": {
                 "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),
                 "PATH": os.environ.get("PATH", "Not set")[:200] + "..." if len(os.environ.get("PATH", "")) > 200 else os.environ.get("PATH", "Not set")

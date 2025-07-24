@@ -4,6 +4,10 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 # Install system dependencies required for Playwright
 RUN apt-get update && apt-get install -y \
     wget \
@@ -19,9 +23,13 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
-RUN playwright install chromium
-RUN playwright install-deps chromium
+
+# Install Playwright browsers with explicit path
+RUN playwright install chromium --with-deps && \
+    playwright install-deps chromium
+
+# Verify installation
+RUN playwright list
 
 # Copy application code
 COPY . .
@@ -29,9 +37,6 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
