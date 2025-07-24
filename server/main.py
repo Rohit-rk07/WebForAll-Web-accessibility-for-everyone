@@ -383,6 +383,46 @@ async def health_check():
         "platform": platform.system()
     }
 
+@app.get("/health/playwright", tags=["System"])
+def playwright_health_check():
+    """Check if Playwright browsers are properly installed."""
+    import subprocess
+    import sys
+    from datetime import datetime
+    
+    try:
+        # Test if playwright can launch a browser
+        test_data = {
+            "url": "data:text/html,<html><body><h1>Test</h1></body></html>",
+            "wcag_options": {"wcag_version": "wcag2", "level": "aa"}
+        }
+        
+        # Run a simple test analysis
+        result = playwright_analyze_url(test_data["url"], test_data["wcag_options"])
+        
+        return {
+            "status": "healthy" if result.get("success") else "unhealthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "playwright_available": result.get("success", False),
+            "error": result.get("error") if not result.get("success") else None,
+            "browser_error": result.get("browser_error", False),
+            "environment_vars": {
+                "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),
+                "PATH": os.environ.get("PATH", "Not set")[:200] + "..." if len(os.environ.get("PATH", "")) > 200 else os.environ.get("PATH", "Not set")
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "playwright_available": False,
+            "error": str(e),
+            "environment_vars": {
+                "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),
+                "PATH": os.environ.get("PATH", "Not set")[:200] + "..." if len(os.environ.get("PATH", "")) > 200 else os.environ.get("PATH", "Not set")
+            }
+        }
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
