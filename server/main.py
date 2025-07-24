@@ -75,7 +75,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://webforall-web-accessibility-for-everyone-production.up.railway.app","http://localhost:5173", "http://localhost:5174"],
+    allow_origins=["https://web-for-all-web-accessibility-for-e.vercel.app","http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
