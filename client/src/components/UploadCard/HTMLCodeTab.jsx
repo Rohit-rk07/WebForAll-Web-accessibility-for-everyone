@@ -57,9 +57,13 @@ const HTMLCodeTab = ({
     clearError();
     
     try {
+      const token = localStorage.getItem('accessToken');
       const response = await fetch(`${API_BASE_URL}/analyze/html`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ 
           content: htmlContent,
           wcag_options: wcagOptions

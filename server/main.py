@@ -37,7 +37,6 @@ from models import (
 # Analysis import (keeping the existing dynamic analysis)
 from analyzer.simple_playwright import analyze_url as playwright_analyze_url
 from bson import ObjectId
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()

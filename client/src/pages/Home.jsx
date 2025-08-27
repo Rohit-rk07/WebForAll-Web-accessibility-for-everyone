@@ -38,9 +38,14 @@ const Home = () => {
     setResult(formattedResult);
   };
 
-  const handleDemoLogin = () => {
-    demoLogin();
-    navigate('/dashboard/home');
+  const handleDemoLogin = async () => {
+    try {
+      await demoLogin();
+      navigate('/dashboard/home');
+    } catch (e) {
+      // Optional: surface an error UI if demo login fails
+      console.error('Demo login failed', e);
+    }
   };
 
   /**

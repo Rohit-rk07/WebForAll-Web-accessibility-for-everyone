@@ -72,9 +72,18 @@ const Login = () => {
   /**
    * Handles demo login
    */
-  const handleDemoLogin = () => {
-    demoLogin();
-    navigate('/dashboard/home');
+  const handleDemoLogin = async () => {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      await demoLogin();
+      navigate('/dashboard/home');
+    } catch (err) {
+      console.error('Demo login error:', err);
+      setError(err.message || 'Demo login failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /**

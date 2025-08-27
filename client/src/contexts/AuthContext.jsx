@@ -206,14 +206,16 @@ export const AuthProvider = ({ children, value }) => {
     setUser(null);
   };
 
-  // Demo login function (for demonstration purposes)
-  const demoLogin = () => {
-    const demoUser = {
-      email: 'demo@example.com',
-      full_name: 'Demo User'
-    };
-    setUser(demoUser);
-    localStorage.setItem('demoUser', JSON.stringify(demoUser));
+  // Demo login function: authenticate using seeded test account
+  const demoLogin = async () => {
+    // Seeded in backend services/db.py: test@example.com / password123
+    setError(null);
+    try {
+      await login({ email: 'test@example.com', password: 'password123' });
+    } catch (err) {
+      setError(err.message || 'Demo login failed');
+      throw err;
+    }
   };
 
   const contextValue = {

@@ -113,8 +113,12 @@ const FileUploadTab = ({
       formData.append('file', file);
       formData.append('wcag_options', JSON.stringify(wcagOptions));
       
+      const token = localStorage.getItem('accessToken');
       const response = await fetch(`${API_BASE_URL}/analyze/file`, {
         method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: formData,
       });
       
