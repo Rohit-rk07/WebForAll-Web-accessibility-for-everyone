@@ -5,7 +5,8 @@ import platform
 import logging
 import uuid
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
+
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -20,9 +21,10 @@ import uvicorn
 from auth import (
     Token, User, UserCreate, PasswordResetRequest, PasswordReset,
     authenticate_user, create_access_token, get_current_active_user,
-    initialize_default_users, fake_users_db, password_reset_tokens,
+    initialize_default_users,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from services.db import users as users_col, password_reset_tokens as prt_col, analyses as analyses_col
 from services import (
     send_welcome_email, send_password_reset_email,
     initialize_gemini, chat_completion, explain_accessibility_issue,
@@ -34,6 +36,7 @@ from models import (
 
 # Analysis import (keeping the existing dynamic analysis)
 from analyzer.simple_playwright import analyze_url as playwright_analyze_url
+from bson import ObjectId
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -49,8 +52,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Running on {platform.system()}")
     
-    # Initialize authentication system
-    initialize_default_users()
+    # Initialize authentication system (indexes + seed)
+    await initialize_default_users()
+
     logger.info("Authentication system initialized")
     
     # Initialize AI services
@@ -96,7 +100,8 @@ async def favicon():
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return access token."""
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    user = await authenticate_user(None, form_data.username, form_data.password)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -113,7 +118,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
     """Register a new user."""
     # Check if user already exists
-    if user.email in fake_users_db:
+    existing = await users_col.find_one({"email": user.email})
+    if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
@@ -121,12 +127,13 @@ async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
     
     # Create new user
     from auth.auth_utils import get_password_hash
-    fake_users_db[user.email] = {
+    await users_col.insert_one({
         "email": user.email,
         "full_name": user.full_name,
         "hashed_password": get_password_hash(user.password),
-        "disabled": False
-    }
+        "disabled": False,
+        "created_at": datetime.utcnow(),
+    })
     
     # Send welcome email
     background_tasks.add_task(send_welcome_email, user.email, user.full_name)
@@ -136,16 +143,34 @@ async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
 @app.post("/forgot-password", tags=["Authentication"])
 async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks):
     """Request password reset."""
-    if request.email not in fake_users_db:
+    existing = await users_col.find_one({"email": request.email})
+    if not existing:
         # Don't reveal if email exists or not for security
         return {"message": "If the email exists, a password reset link has been sent"}
     
+    # Cooldown: prevent spamming reset emails
+    try:
+        # Find the most recent token for this email
+        last = await prt_col.find_one({"email": request.email}, sort=[("created_at", -1)])
+    except Exception:
+        last = None
+
+    cooldown_minutes = int(os.environ.get("RESET_EMAIL_COOLDOWN_MINUTES", "2"))
+    now = datetime.utcnow()
+
+    if last and last.get("created_at") and (now - last["created_at"]) < timedelta(minutes=cooldown_minutes):
+        # Respect cooldown: do not create a new token or send a new email
+        return {"message": "If the email exists, a password reset link has been sent"}
+
     # Generate reset token
     reset_token = str(uuid.uuid4())
-    password_reset_tokens[reset_token] = {
+    await prt_col.insert_one({
+        "token": reset_token,
         "email": request.email,
-        "expires": timedelta(hours=1)  # Token expires in 1 hour
-    }
+        # TTL index on expiresAt will auto-delete
+        "expiresAt": now + timedelta(hours=1),
+        "created_at": now,
+    })
     
     # Send reset email
     background_tasks.add_task(send_password_reset_email, request.email, reset_token)
@@ -155,27 +180,27 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
 @app.post("/reset-password", tags=["Authentication"])
 async def reset_password(reset_data: PasswordReset):
     """Reset user password using token."""
-    if reset_data.token not in password_reset_tokens:
+    token_doc = await prt_col.find_one({"token": reset_data.token})
+    if not token_doc or token_doc.get("expiresAt") < datetime.utcnow():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
         )
-    
-    token_data = password_reset_tokens[reset_data.token]
-    email = token_data["email"]
-    
-    if email not in fake_users_db:
+
+    email = token_doc["email"]
+    user_doc = await users_col.find_one({"email": email})
+    if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User not found"
         )
-    
+
     # Update password
     from auth.auth_utils import get_password_hash
-    fake_users_db[email]["hashed_password"] = get_password_hash(reset_data.new_password)
-    
+    await users_col.update_one({"email": email}, {"$set": {"hashed_password": get_password_hash(reset_data.new_password)}})
+
     # Remove used token
-    del password_reset_tokens[reset_data.token]
+    await prt_col.delete_one({"token": reset_data.token})
     
     return {"message": "Password reset successfully"}
 
@@ -189,7 +214,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 # ============================================================================
 
 @app.post("/analyze/url", tags=["Analysis"])
-async def analyze_url(request: URLAnalysisRequest):
+async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
     """
     Analyze a URL for accessibility issues.
     
@@ -220,7 +245,32 @@ async def analyze_url(request: URLAnalysisRequest):
                 detail="Analysis failed - unable to analyze the URL"
             )
         
-        return result
+        # Persist analysis for the authenticated user and return its id
+        try:
+            violations_count = (
+                result.get("violations_count")
+                if isinstance(result, dict)
+                else None
+            )
+            if violations_count is None and isinstance(result, dict):
+                violations = result.get("violations") or []
+                violations_count = len(violations) if isinstance(violations, list) else 0
+            insert_doc = {
+                "owner_email": current_user.email,
+                "input_type": "url",
+                "input_ref": str(request.url),
+                "wcag_options": wcag_options,
+                "violations_count": violations_count,
+                "summary": result.get("summary") if isinstance(result, dict) else None,
+                "result": result if isinstance(result, dict) else {"raw": result},
+                "created_at": datetime.utcnow(),
+            }
+            insert_res = await analyses_col.insert_one(insert_doc)
+            return {"id": str(insert_res.inserted_id), **result}
+        except Exception as e:
+            logger.warning(f"Failed to persist analysis history: {e}")
+            # Even if persistence fails, return the analysis result without id
+            return result
         
     except Exception as e:
         logger.error(f"Error analyzing URL {request.url}: {str(e)}")
@@ -230,7 +280,7 @@ async def analyze_url(request: URLAnalysisRequest):
         )
 
 @app.post("/analyze/html", tags=["Analysis"])
-async def analyze_html(request: HTMLAnalysisRequest):
+async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
     """
     Analyze HTML content for accessibility issues.
     
@@ -267,7 +317,25 @@ async def analyze_html(request: HTMLAnalysisRequest):
                 detail="Analysis failed - unable to analyze the HTML content"
             )
         
-        return result
+        # Persist + return id
+        try:
+            violations = result.get("violations") if isinstance(result, dict) else []
+            violations_count = len(violations) if isinstance(violations, list) else result.get("violations_count", 0)
+            insert_doc = {
+                "owner_email": current_user.email,
+                "input_type": "html",
+                "input_ref": "inline_html",
+                "wcag_options": wcag_options,
+                "violations_count": violations_count,
+                "summary": result.get("summary") if isinstance(result, dict) else None,
+                "result": result if isinstance(result, dict) else {"raw": result},
+                "created_at": datetime.utcnow(),
+            }
+            insert_res = await analyses_col.insert_one(insert_doc)
+            return {"id": str(insert_res.inserted_id), **result}
+        except Exception as e:
+            logger.warning(f"Failed to persist HTML analysis history: {e}")
+            return result
         
     except Exception as e:
         logger.error(f"Error analyzing HTML content: {str(e)}")
@@ -277,7 +345,7 @@ async def analyze_html(request: HTMLAnalysisRequest):
         )
 
 @app.post("/analyze/file", tags=["Analysis"])
-async def analyze_file(file: UploadFile = File(...), wcag_options: str = Form(None)):
+async def analyze_file(current_user: User = Depends(get_current_active_user), file: UploadFile = File(...), wcag_options: str = Form(None)):
     """
     Analyze an uploaded HTML file for accessibility issues.
     
@@ -325,7 +393,25 @@ async def analyze_file(file: UploadFile = File(...), wcag_options: str = Form(No
                 detail="Analysis failed - unable to analyze the uploaded file"
             )
         
-        return result
+        # Persist + return id
+        try:
+            violations = result.get("violations") if isinstance(result, dict) else []
+            violations_count = len(violations) if isinstance(violations, list) else result.get("violations_count", 0)
+            insert_doc = {
+                "owner_email": current_user.email,
+                "input_type": "file",
+                "input_ref": file.filename,
+                "wcag_options": parsed_wcag_options,
+                "violations_count": violations_count,
+                "summary": result.get("summary") if isinstance(result, dict) else None,
+                "result": result if isinstance(result, dict) else {"raw": result},
+                "created_at": datetime.utcnow(),
+            }
+            insert_res = await analyses_col.insert_one(insert_doc)
+            return {"id": str(insert_res.inserted_id), **result}
+        except Exception as e:
+            logger.warning(f"Failed to persist file analysis history: {e}")
+            return result
         
     except Exception as e:
         logger.error(f"Error analyzing file {file.filename}: {str(e)}")
@@ -382,6 +468,44 @@ async def health_check():
         "version": "2.0.0",
         "platform": platform.system()
     }
+
+# ============================================================================
+# HISTORY ENDPOINTS (Authenticated)
+# ============================================================================
+
+@app.get("/history", tags=["History"])
+async def list_history(limit: int = 50, current_user: User = Depends(get_current_active_user)):
+    """List recent analyses for the current user."""
+    cursor = analyses_col.find({"owner_email": current_user.email}).sort("created_at", -1).limit(max(1, min(limit, 200)))
+    items = []
+    async for doc in cursor:
+        doc["id"] = str(doc.get("_id"))
+        doc.pop("_id", None)
+        items.append(doc)
+    return {"items": items}
+
+@app.get("/history/{item_id}", tags=["History"])
+async def get_history_item(item_id: str, current_user: User = Depends(get_current_active_user)):
+    try:
+        oid = ObjectId(item_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid id")
+    doc = await analyses_col.find_one({"_id": oid, "owner_email": current_user.email})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found")
+    doc["id"] = str(doc.pop("_id"))
+    return doc
+
+@app.delete("/history/{item_id}", tags=["History"])
+async def delete_history_item(item_id: str, current_user: User = Depends(get_current_active_user)):
+    try:
+        oid = ObjectId(item_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid id")
+    res = await analyses_col.delete_one({"_id": oid, "owner_email": current_user.email})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"deleted": True}
 
 @app.get("/health/playwright", tags=["System"])
 def playwright_health_check():

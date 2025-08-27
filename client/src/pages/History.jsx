@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { 
   Typography, 
   Box, 
@@ -32,6 +33,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 
+// API base URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 /**
  * Get severity level based on score
  * @param {number} score - Accessibility score
@@ -55,25 +59,53 @@ const History = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const theme = useTheme();
 
-  // Load reports on component mount
+  // Load reports from backend on mount
   useEffect(() => {
-    const stored = localStorage.getItem('historyReports');
-    setReports(stored ? JSON.parse(stored) : []);
-    setLoading(false);
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${API_BASE_URL}/history?limit=100`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to load history (${res.status})`);
+        }
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        // Normalize to table shape
+        const mapped = items.map((it, idx) => ({
+          id: it.id || String(idx),
+          url: it.input_ref || '',
+          name: it.input_type === 'url' ? new URL(it.input_ref || '', window.location.origin).hostname : it.input_type,
+          date: it.created_at || null,
+          violations_count: typeof it.violations_count === 'number' ? it.violations_count : 0,
+        }));
+        setReports(mapped);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
   }, []);
 
   // Filter reports based on search term
   const filteredReports = reports.filter(report => 
-    report.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    report.url.toLowerCase().includes(searchTerm.toLowerCase())
+    (report.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (report.url || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Sort reports based on sort field and direction
@@ -82,10 +114,10 @@ const History = () => {
     
     if (sortField === 'name') {
       comparison = a.name.localeCompare(b.name);
-    } else if (sortField === 'score') {
-      comparison = a.score - b.score;
+    } else if (sortField === 'violations') {
+      comparison = (a.violations_count || 0) - (b.violations_count || 0);
     } else if (sortField === 'date') {
-      comparison = new Date(a.date) - new Date(b.date);
+      comparison = new Date(a.date || 0) - new Date(b.date || 0);
     }
     
     return sortDirection === 'asc' ? comparison : -comparison;
@@ -101,11 +133,10 @@ const History = () => {
     }
   };
 
-  // Handle view report
+  // Handle view report (navigate to deep-linked results)
   const handleViewReport = (report) => {
-    // In a real app, this would navigate to the results page with the report data
-
-    // navigate('/dashboard/results', { state: { result: report } });
+    if (!report?.id) return;
+    navigate(`/dashboard/results/${report.id}`);
   };
 
   // Handle edit report name
@@ -130,13 +161,21 @@ const History = () => {
     setDeleteDialogOpen(true);
   };
 
-  // Confirm delete report
-  const handleConfirmDelete = () => {
-    if (currentReport) {
-      const updated = reports.filter(report => report.id !== currentReport.id && report.url !== currentReport.url);
+  // Confirm delete report (calls backend)
+  const handleConfirmDelete = async () => {
+    if (!currentReport) return;
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE_URL}/history/${currentReport.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      const updated = reports.filter(r => r.id !== currentReport.id);
       setReports(updated);
-      localStorage.setItem('historyReports', JSON.stringify(updated));
       setDeleteDialogOpen(false);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -151,42 +190,6 @@ const History = () => {
           Track your accessibility testing progress and revisit previous reports
         </Typography>
       </Paper>
-      
-      {/* Stats Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" color="primary" fontWeight="bold">
-            {reports.length}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Total Reports
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" color="success.main" fontWeight="bold">
-            {reports.filter(r => r.score >= 80).length}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Good Scores (80+)
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" color="warning.main" fontWeight="bold">
-            {reports.filter(r => r.score >= 60 && r.score < 80).length}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Fair Scores (60-79)
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" color="error.main" fontWeight="bold">
-            {reports.filter(r => r.score < 60).length}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Needs Work (&lt;60)
-          </Typography>
-        </Paper>
-      </Box>
       
       {/* Search and Filter Section */}
       <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
@@ -226,12 +229,12 @@ const History = () => {
           </Button>
           
           <Button 
-            variant={sortField === 'score' ? 'contained' : 'outlined'}
+            variant={sortField === 'violations' ? 'contained' : 'outlined'}
             startIcon={<FilterList />}
-            onClick={() => handleSort('score')}
+            onClick={() => handleSort('violations')}
             size="small"
           >
-            Score {sortField === 'score' && (sortDirection === 'asc' ? '↑' : '↓')}
+            Violations {sortField === 'violations' && (sortDirection === 'asc' ? '↑' : '↓')}
           </Button>
         </Box>
       </Box>
@@ -246,50 +249,28 @@ const History = () => {
             <TableHead>
               <TableRow sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'primary.50' }}>
                 <TableCell><Typography fontWeight="bold">Website</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">URL</Typography></TableCell>
+                <TableCell><Typography fontWeight="bold">URL / Input</Typography></TableCell>
                 <TableCell><Typography fontWeight="bold">Date</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">Score</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">Issues</Typography></TableCell>
+                <TableCell><Typography fontWeight="bold">Violations</Typography></TableCell>
                 <TableCell align="right"><Typography fontWeight="bold">Actions</Typography></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {sortedReports.length > 0 ? (
                 sortedReports.map((report) => {
-                  const severity = getSeverityLevel(report.score);
                   return (
                     <TableRow key={report.id} hover>
                       <TableCell>
                         <Typography fontWeight="medium">{report.name}</Typography>
                       </TableCell>
                       <TableCell>{report.url}</TableCell>
-                      <TableCell>{new Date(report.date).toLocaleDateString()}</TableCell>
+                      <TableCell>{report.date ? new Date(report.date).toLocaleString() : '-'}</TableCell>
                       <TableCell>
                         <Chip 
-                          label={`${report.score} - ${severity.level}`}
-                          color={severity.color}
+                          label={`${report.violations_count ?? 0}`}
+                          color={(report.violations_count ?? 0) === 0 ? 'success' : (report.violations_count < 10 ? 'warning' : 'error')}
                           size="small"
                         />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {report.issues.errors > 0 && (
-                            <Chip 
-                              label={`${report.issues.errors} Errors`}
-                              color="error"
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                          {report.issues.warnings > 0 && (
-                            <Chip 
-                              label={`${report.issues.warnings} Warnings`}
-                              color="warning"
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>

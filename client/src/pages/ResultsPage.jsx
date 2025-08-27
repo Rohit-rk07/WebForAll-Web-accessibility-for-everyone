@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { 
   Box, 
   Paper, 
@@ -32,6 +32,9 @@ import {
   calculateResultCounts 
 } from '../utils/resultsUtils';
 
+// API base URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 /**
  * Results Page component
  * Displays detailed accessibility analysis results in a structured format
@@ -50,27 +53,47 @@ const ResultsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const resultsRef = useRef(null);
+  const [analyzedUrl, setAnalyzedUrl] = useState('');
   
+  const { id } = useParams();
+
   useEffect(() => {
-    // Get result from location state or redirect to dashboard
-    if (location.state?.result) {
-      setResult(location.state.result);
-      
-      // Calculate score using utility function
-      const scoreData = calculateAccessibilityScore(location.state.result);
-      setScore(scoreData.score);
-      setTotalIssues(scoreData.totalIssues);
-      setSeverityCounts(scoreData.severityCounts);
-      
-      // Calculate result counts using utility function
-      const counts = calculateResultCounts(location.state.result);
-      setResultCounts(counts);
-      
-      setLoading(false);
-    } else {
-      navigate('/dashboard/home');
-    }
-  }, [location, navigate]);
+    const loadById = async () => {
+      if (!id) {
+        navigate('/dashboard/home');
+        return;
+      }
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${API_BASE_URL}/history/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to load results (${res.status})`);
+        }
+        const doc = await res.json();
+        const analyzed = doc.result || doc; // fallback if server didn't persist full result
+        setResult(analyzed);
+        // Derive analyzed URL reliably from server document
+        const urlFromResult = analyzed?.url || analyzed?.pageUrl;
+        const urlFromDoc = doc?.input_type === 'url' ? doc?.input_ref : undefined;
+        setAnalyzedUrl(urlFromResult || urlFromDoc || '');
+        const scoreData = calculateAccessibilityScore(analyzed);
+        setScore(scoreData.score);
+        setTotalIssues(scoreData.totalIssues);
+        setSeverityCounts(scoreData.severityCounts);
+        const counts = calculateResultCounts(analyzed);
+        setResultCounts(counts);
+        setLoading(false);
+      } catch (e) {
+        console.error(e);
+        navigate('/dashboard/home');
+      }
+    };
+    loadById();
+  }, [id, navigate]);
 
   /**
    * Handle tab change
@@ -148,9 +171,19 @@ const ResultsPage = () => {
           <IconButton onClick={handleBackClick} color="primary">
             <ArrowBack />
           </IconButton>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-            Accessibility Analysis Results
-          </Typography>
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+              Accessibility Analysis Results
+            </Typography>
+            {analyzedUrl && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                <strong>Analyzed URL:</strong>{' '}
+                <a href={analyzedUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>
+                  {analyzedUrl}
+                </a>
+              </Typography>
+            )}
+          </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
           <Button

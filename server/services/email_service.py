@@ -32,15 +32,26 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         msg["Subject"] = subject
         msg["From"] = EMAIL_FROM
         msg["To"] = to_email
+        msg.set_content(body)
         
-        # For development, just log the email
-        logger.info(f"Email to: {to_email}, Subject: {subject}, Body: {body}")
+        # Log for observability in all environments
+        logger.info(f"Email to: {to_email}, Subject: {subject}")
         
-        # In production, uncomment this to send actual emails
-        # with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-        #     if EMAIL_USER and EMAIL_PASSWORD:
-        #         server.login(EMAIL_USER, EMAIL_PASSWORD)
-        #     server.send_message(msg)
+        # Send email via SMTP (supports local dev like MailHog or real SMTP)
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            try:
+                # Try STARTTLS if server supports it
+                server.starttls()
+            except Exception:
+                # Some dev servers (e.g., MailHog) do not support STARTTLS; ignore
+                pass
+            if EMAIL_USER and EMAIL_PASSWORD:
+                try:
+                    server.login(EMAIL_USER, EMAIL_PASSWORD)
+                except Exception:
+                    # If login not required (MailHog), continue
+                    pass
+            server.send_message(msg)
         
         return True
     except Exception as e:

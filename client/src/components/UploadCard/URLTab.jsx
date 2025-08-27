@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { Search } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
@@ -13,15 +14,7 @@ const DEFAULT_WCAG_OPTIONS = {
   best_practice: true      // Include best practices
 };
 
-const saveToHistory = (report) => {
-  const history = JSON.parse(localStorage.getItem('historyReports') || '[]');
-  // Remove any existing entry for the same URL
-  const filtered = history.filter(r => r.url !== report.url);
-  localStorage.setItem('historyReports', JSON.stringify([
-    { ...report, date: new Date().toISOString() },
-    ...filtered
-  ]));
-};
+// Note: history is now persisted server-side; no localStorage writes here.
 
 /**
  * URLTab component for analyzing URLs
@@ -39,6 +32,7 @@ const URLTab = ({ onAnalyze, setIsLoading, isLoading, colors, onError = () => {}
   const [url, setUrl] = useState('');
   const [localError, setLocalError] = useState(null);
   const [wcagOptions, setWcagOptions] = useState(DEFAULT_WCAG_OPTIONS);
+  const navigate = useNavigate();
 
   /**
    * Submits URL for analysis
@@ -51,9 +45,13 @@ const URLTab = ({ onAnalyze, setIsLoading, isLoading, colors, onError = () => {}
     clearError();
     
     try {
+      const token = localStorage.getItem('accessToken');
       const response = await fetch(`${API_BASE_URL}/analyze/url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ 
           url,
           wcag_options: wcagOptions
@@ -77,8 +75,11 @@ const URLTab = ({ onAnalyze, setIsLoading, isLoading, colors, onError = () => {}
         score: result.score || (result.results && result.results.score) || 0,
         issues: result.issues || (result.results && result.results.issues) || { errors: 0, warnings: 0, notices: 0 },
       };
-      saveToHistory(formattedResult);
-      onAnalyze(formattedResult);
+      if (result && result.id) {
+        navigate(`/dashboard/results/${result.id}`);
+      } else {
+        onAnalyze(formattedResult);
+      }
     } catch (err) {
       console.error('Analysis error:', err);
       setLocalError(err.message);

@@ -13,25 +13,20 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   useTheme,
   alpha
 } from '@mui/material';
+
 import { 
   Visibility, 
   VisibilityOff, 
   Email, 
   Lock,
-  Security,
-  Person
+  Security
 } from '@mui/icons-material';
+
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-
 
 
 
@@ -46,14 +41,11 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
-  const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false);
-  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  
   
   // Hooks
   const navigate = useNavigate();
-  const { login, demoLogin, forgotPassword } = useAuth();
+  const { login, demoLogin } = useAuth();
   const theme = useTheme();
 
   /**
@@ -92,39 +84,7 @@ const Login = () => {
     setShowPassword(!showPassword);
   };
 
-  /**
-   * Opens forgot password dialog
-   */
-  const handleForgotPasswordOpen = () => {
-    setForgotPasswordEmail(email);
-    setForgotPasswordOpen(true);
-  };
-
-  /**
-   * Closes forgot password dialog
-   */
-  const handleForgotPasswordClose = () => {
-    setForgotPasswordOpen(false);
-    setForgotPasswordSuccess(false);
-  };
-
-  /**
-   * Handles forgot password submission
-   */
-  const handleForgotPasswordSubmit = async (e) => {
-    e.preventDefault();
-    setForgotPasswordSubmitting(true);
-    
-    try {
-      await forgotPassword(forgotPasswordEmail);
-      setForgotPasswordSuccess(true);
-    } catch (err) {
-      console.error('Forgot password error:', err);
-      // We don't show specific errors to prevent email enumeration
-    } finally {
-      setForgotPasswordSubmitting(false);
-    }
-  };
+  
 
   return (
     <Box 
@@ -237,10 +197,9 @@ const Login = () => {
             {/* Forgot Password Link */}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <MuiLink 
-                component="button" 
-                type="button" 
-                variant="body2" 
-                onClick={handleForgotPasswordOpen}
+                component={Link}
+                to="/forgot-password"
+                variant="body2"
                 underline="hover"
               >
                 Forgot password?
@@ -299,56 +258,7 @@ const Login = () => {
         </Paper>
       </Container>
 
-      {/* Forgot Password Dialog */}
-      <Dialog open={forgotPasswordOpen} onClose={handleForgotPasswordClose}>
-        <DialogTitle>Reset Password</DialogTitle>
-        <DialogContent>
-          {forgotPasswordSuccess ? (
-            <DialogContentText>
-              If an account exists with this email, you will receive a password reset link shortly.
-              Please check your email inbox.
-            </DialogContentText>
-          ) : (
-            <>
-              <DialogContentText>
-                Enter your email address and we'll send you a link to reset your password.
-              </DialogContentText>
-              <Box component="form" onSubmit={handleForgotPasswordSubmit} sx={{ mt: 2 }}>
-                <TextField
-                  autoFocus
-                  margin="dense"
-                  label="Email Address"
-                  type="email"
-                  fullWidth
-                  variant="outlined"
-                  required
-                  value={forgotPasswordEmail}
-                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                  disabled={forgotPasswordSubmitting}
-                />
-              </Box>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {forgotPasswordSuccess ? (
-            <Button onClick={handleForgotPasswordClose}>Close</Button>
-          ) : (
-            <>
-              <Button onClick={handleForgotPasswordClose} disabled={forgotPasswordSubmitting}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleForgotPasswordSubmit} 
-                disabled={forgotPasswordSubmitting}
-                variant="contained"
-              >
-                {forgotPasswordSubmitting ? <CircularProgress size={24} /> : 'Send Reset Link'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
+      
     </Box>
   );
 };

@@ -117,7 +117,7 @@ const WCAGOptions = ({ options, onChange, colors }) => {
             icon={<InfoOutlined fontSize="inherit" />}
             sx={{ mb: 2, '& .MuiAlert-message': { width: '100%' } }}
           >
-            <Typography variant="body2">
+            <Typography component="div" variant="body2">
               <strong>Version Selection:</strong>
               <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px' }}>
                 <li>WCAG 2.0 - Only checks 2.0 requirements</li>

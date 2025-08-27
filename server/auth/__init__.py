@@ -19,8 +19,6 @@ from .auth_utils import (
     get_current_user,
     get_current_active_user,
     initialize_default_users,
-    fake_users_db,
-    password_reset_tokens,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
@@ -42,7 +40,5 @@ __all__ = [
     "get_current_user",
     "get_current_active_user",
     "initialize_default_users",
-    "fake_users_db",
-    "password_reset_tokens",
     "ACCESS_TOKEN_EXPIRE_MINUTES"
 ]

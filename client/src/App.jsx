@@ -1,20 +1,23 @@
 // src/App.jsx
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AiChatbot from './components/AiChatbot';
 
-// Pages
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import DashboardHome from './pages/DashboardHome';
-import History from './pages/History';
-import ResultsPage from './pages/ResultsPage';
+// Lazy-loaded Pages
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const DashboardHome = lazy(() => import('./pages/DashboardHome'));
+const History = lazy(() => import('./pages/History'));
+const ResultsPage = lazy(() => import('./pages/ResultsPage'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
-// Layouts
-import DashboardLayout from './layouts/DashboardLayout';
+// Lazy-loaded Layouts
+const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
 
 /**
  * Protected Route Component
@@ -107,23 +110,27 @@ function AppContent() {
       <AuthProvider>
         <Box sx={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
           <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              {/* Dashboard Routes (Protected) */}
-              <Route element={<ProtectedRoute />}>
-                <Route path="/dashboard" element={<DashboardLayout />}>
-                  <Route index element={<Navigate to="/dashboard/home" replace />} />
-                  <Route path="home" element={<DashboardHome />} />
-                  <Route path="results" element={<ResultsPage />} />
-                  <Route path="history" element={<History />} />
+            <Suspense fallback={<Box sx={{ p: 4 }} />}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                {/* Dashboard Routes (Protected) */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/dashboard" element={<DashboardLayout />}>
+                    <Route index element={<Navigate to="/dashboard/home" replace />} />
+                    <Route path="home" element={<DashboardHome />} />
+                    <Route path="results/:id" element={<ResultsPage />} />
+                    <Route path="history" element={<History />} />
+                  </Route>
                 </Route>
-              </Route>
-              {/* Fallback Route */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* Fallback Route */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
             <AiChatbot />
           </BrowserRouter>
         </Box>

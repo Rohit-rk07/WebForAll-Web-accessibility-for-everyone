@@ -106,7 +106,7 @@ export const AuthProvider = ({ children, value }) => {
   const register = async ({ email, fullName, password }) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/register`, {
+      const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -151,7 +151,7 @@ export const AuthProvider = ({ children, value }) => {
   const forgotPassword = async (email) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/forgot-password`, {
+      const response = await fetch(`${API_BASE_URL}/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -176,7 +176,7 @@ export const AuthProvider = ({ children, value }) => {
   const resetPassword = async (token, newPassword) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
