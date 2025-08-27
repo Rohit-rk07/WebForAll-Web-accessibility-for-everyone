@@ -3,6 +3,7 @@ import { Box, Button, Typography, IconButton } from '@mui/material';
 import { CloudUpload, Delete } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
 import { useTheme } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 
 // API base URL from environment or default to localhost
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -39,6 +40,7 @@ const FileUploadTab = ({
   const [wcagOptions, setWcagOptions] = useState(DEFAULT_WCAG_OPTIONS);
 
   const theme = useTheme();
+  const navigate = useNavigate();
   
   // Update COLORS to use theme values
   const COLORS = {
@@ -128,6 +130,11 @@ const FileUploadTab = ({
       }
       
       const result = await response.json();
+
+      if (result && result.id) {
+        navigate(`/dashboard/results/${result.id}`);
+        return;
+      }
       onAnalyze(result);
     } catch (err) {
       console.error('Analysis error:', err);

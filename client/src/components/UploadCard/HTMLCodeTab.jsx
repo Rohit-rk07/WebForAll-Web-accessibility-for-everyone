@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Button, TextField, Typography, Tooltip } from '@mui/material';
 import { HelpOutline } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
+import { useNavigate } from 'react-router-dom';
 
 // API base URL from environment or default to localhost
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -36,6 +37,7 @@ const HTMLCodeTab = ({
   const [htmlContent, setHtmlContent] = useState('');
   const [localError, setLocalError] = useState(null);
   const [wcagOptions, setWcagOptions] = useState(DEFAULT_WCAG_OPTIONS);
+  const navigate = useNavigate();
 
   const saveToHistory = (report) => {
     const history = JSON.parse(localStorage.getItem('historyReports') || '[]');
@@ -76,17 +78,23 @@ const HTMLCodeTab = ({
       }
       
       const result = await response.json();
-      
-      // Format the result to ensure it has the expected structure
+
+      // If the server persisted analysis and returned an id, navigate to results page
+      if (result && result.id) {
+        navigate(`/dashboard/results/${result.id}`);
+        return;
+      }
+
+      // Fallback: format locally and pass up
       const formattedResult = {
         ...result,
-        results: result.results || {},
-        mode: result.mode || 'static_only',
+        results: result?.results || {},
+        mode: result?.mode || 'dynamic',
         id: Date.now() + Math.random(),
         name: 'HTML Analysis',
         url: '',
-        score: result.score || (result.results && result.results.score) || 0,
-        issues: result.issues || (result.results && result.results.issues) || { errors: 0, warnings: 0, notices: 0 },
+        score: result?.score || (result?.results && result?.results?.score) || 0,
+        issues: result?.issues || (result?.results && result?.results?.issues) || { errors: 0, warnings: 0, notices: 0 },
       };
       saveToHistory(formattedResult);
       onAnalyze(formattedResult);
