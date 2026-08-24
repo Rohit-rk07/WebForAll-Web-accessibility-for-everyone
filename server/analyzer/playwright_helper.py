@@ -2,11 +2,11 @@
 # playwright_helper.py - Reusable Playwright helper for accessibility testing
 
 import sys
+import asyncio
 import json
 import logging
 import traceback
 from typing import Dict, Any, List
-from functools import lru_cache
 
 import requests
 from playwright.async_api import async_playwright
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _PLAYWRIGHT = None
 _BROWSER = None
+_AXE_SOURCE = None
 _AXE_URL = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js"
 
 
@@ -90,17 +91,20 @@ async def get_browser():
     return _BROWSER
 
 
-@lru_cache(maxsize=1)
 async def get_axe_source() -> str | None:
-    """Fetch and cache axe-core once per process to avoid repeated CDN requests."""
+    """Fetch and cache axe-core source without caching a coroutine object."""
+    global _AXE_SOURCE
+
+    if _AXE_SOURCE is not None:
+        return _AXE_SOURCE
+
     try:
-        import aiohttp
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
-            async with session.get(_AXE_URL) as response:
-                response.raise_for_status()
-                return await response.text()
+        response = await asyncio.to_thread(requests.get, _AXE_URL, timeout=15)
+        response.raise_for_status()
+        _AXE_SOURCE = response.text
+        return _AXE_SOURCE
     except Exception as exc:
-        logger.warning(f"Unable to cache axe-core source locally: {exc}")
+        logger.warning(f"Unable to fetch axe-core source: {exc}")
         return None
 
 
@@ -147,7 +151,10 @@ async def run_analysis(data: Dict[str, Any]):
         page = None
         try:
             logger.info("Creating browser context...")
-            context = await browser.new_context(viewport={"width": 1280, "height": 720})
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 720},
+                bypass_csp=True,
+            )
             page = await context.new_page()
 
             logger.info(f"Navigating to URL: {url}")

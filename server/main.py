@@ -5,10 +5,16 @@ import platform
 import logging
 import uuid
 import json
+import asyncio
+import sys
 from datetime import timedelta, datetime
 
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
+# Playwright's async transport requires subprocess support on Windows.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 # Load environment variables from .env file
 load_dotenv()

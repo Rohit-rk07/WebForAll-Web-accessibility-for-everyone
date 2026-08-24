@@ -1,8 +1,10 @@
 """Simple Playwright analyzer for accessibility testing."""
 
 import sys
+import asyncio
 import logging
 import json
+import threading
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -12,6 +14,22 @@ logger = logging.getLogger(__name__)
 
 # Import the helper implementation directly to avoid subprocess overhead.
 HELPER_SCRIPT = Path(__file__).parent / "playwright_helper.py"
+_WINDOWS_ANALYSIS_LOCK = threading.Lock()
+
+
+async def _run_windows_analysis_async(data: Dict[str, Any]):
+    from analyzer.playwright_helper import close_browser, run_analysis
+
+    try:
+        return await run_analysis(data)
+    finally:
+        await close_browser()
+
+
+def _run_windows_analysis(data: Dict[str, Any]):
+    """Run Playwright on a dedicated Proactor loop on Windows."""
+    with _WINDOWS_ANALYSIS_LOCK:
+        return asyncio.run(_run_windows_analysis_async(data))
 
 async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
     """
@@ -35,13 +53,18 @@ async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
                 "mode": "static_only"
             }
 
-        # Import lazily so the module stays light until analysis is requested.
-        from analyzer.playwright_helper import run_analysis
-
         data = {
             "url": url,
             "wcag_options": wcag_options or {}
         }
+
+        # Uvicorn uses a selector loop for Windows reload mode, which cannot
+        # create the subprocess used by Playwright's async transport.
+        if sys.platform == "win32":
+            return await asyncio.to_thread(_run_windows_analysis, data)
+
+        # Import lazily so the module stays light until analysis is requested.
+        from analyzer.playwright_helper import run_analysis
         return await run_analysis(data)
     except Exception as e:
         logger.error(f"Error analyzing URL: {e}")
