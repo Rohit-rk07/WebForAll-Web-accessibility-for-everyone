@@ -1,9 +1,8 @@
-"""Simple Playwright analyzer for accessibility testing that avoids asyncio issues on Windows."""
+"""Simple Playwright analyzer for accessibility testing."""
 
 import sys
 import logging
 import json
-import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -11,7 +10,7 @@ from typing import Dict, Any, Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Path to the helper script that will run in a separate process
+# Import the helper implementation directly to avoid subprocess overhead.
 HELPER_SCRIPT = Path(__file__).parent / "playwright_helper.py"
 
 def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
@@ -28,7 +27,6 @@ def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
     logger.info(f"Analyzing URL: {url}")
     
     try:
-        # Check if helper script exists
         if not HELPER_SCRIPT.exists():
             logger.error(f"Helper script not found at {HELPER_SCRIPT}")
             return {
@@ -36,46 +34,15 @@ def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
                 "error": f"Helper script not found at {HELPER_SCRIPT}",
                 "mode": "static_only"
             }
-        
-        # Create data object to pass to helper script
+
+        # Import lazily so the module stays light until analysis is requested.
+        from analyzer.playwright_helper import run_analysis
+
         data = {
             "url": url,
             "wcag_options": wcag_options or {}
         }
-        
-        # Run the helper script as a separate process
-        cmd = [sys.executable, str(HELPER_SCRIPT)]
-        logger.info(f"Running command: {' '.join(cmd)}")
-        
-        # Use subprocess.run to completely avoid asyncio
-        result = subprocess.run(
-            cmd,
-            input=json.dumps(data),
-            capture_output=True,
-            text=True,
-            check=False  # Don't raise exception on non-zero exit
-        )
-        
-        if result.returncode != 0:
-            logger.error(f"Helper script failed with exit code {result.returncode}")
-            logger.error(f"STDERR: {result.stderr}")
-            return {
-                "success": False,
-                "error": result.stderr or "Unknown error in helper script",
-                "mode": "static_only"
-            }
-        
-        # Parse the JSON output
-        try:
-            return json.loads(result.stdout)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse helper script output: {e}")
-            logger.error(f"Output: {result.stdout}")
-            return {
-                "success": False,
-                "error": f"Failed to parse results: {str(e)}",
-                "mode": "static_only"
-            }
+        return run_analysis(data)
     except Exception as e:
         logger.error(f"Error analyzing URL: {e}")
         import traceback

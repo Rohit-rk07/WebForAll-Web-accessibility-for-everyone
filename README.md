@@ -1,109 +1,138 @@
 # Accessibility Analyzer
 
-A comprehensive web accessibility analysis tool that helps identify and fix accessibility issues in websites and web applications.
-
-## Overview
-
-The Accessibility Analyzer is a full-stack application that provides automated accessibility testing for web content. It helps developers and content creators ensure their websites are accessible to users with disabilities and comply with accessibility standards like WCAG.
-
-![Accessibility Analyzer Screenshot](https://via.placeholder.com/800x400?text=Accessibility+Analyzer)
-
-## Features
-
-- **Multiple Input Methods**: Analyze URLs, upload HTML files, or paste HTML code directly
-- **Comprehensive Analysis**: Combines static and dynamic analysis techniques
-- **WCAG Compliance**: Checks against Web Content Accessibility Guidelines
-- **AI-Powered Assistance**: Gemini AI integration for intelligent explanations and guidance
-- **Real-time Chat Support**: Interactive AI assistant for accessibility questions
-- **Detailed Reports**: Provides detailed reports with severity levels and recommendations
-- **Score Visualization**: Visual representation of accessibility score
-- **Issue Categorization**: Groups issues by category for easier remediation
+Full-stack accessibility scanner with a React client and FastAPI server.
 
 ## Project Structure
 
-The project consists of two main components:
+- `client/` - React + Vite frontend
+- `server/` - FastAPI backend with Playwright analysis
 
-- **Client**: React-based frontend application
-- **Server**: FastAPI-based backend service
+## Prerequisites
 
-## Getting Started
+- Node.js 18+ and npm
+- Python 3.11+
+- MongoDB Atlas account and database user
+- Optional: Gemini API key for AI features
 
-### Prerequisites
+## 1. Server Setup
 
-- Node.js 14.x or higher
-- Python 3.8 or higher
-- npm or yarn
-- pip (Python package manager)
-
-### Setup Instructions
-
-#### 1. Clone the repository
-
-```bash
-git clone https://github.com/yourusername/accessibility-analyzer.git
-cd accessibility-analyzer
-```
-
-#### 2. Set up the server
+1. Open a terminal in the project root.
+2. Go to the server folder:
 
 ```bash
 cd server
+```
 
-# Create and activate virtual environment
+3. Create a virtual environment:
+
+```bash
 python -m venv venv
-# On Windows
+```
+
+4. Activate it on Windows:
+
+```bash
 venv\Scripts\activate
-# On macOS/Linux
-source venv/bin/activate
+```
 
-# Install dependencies
+5. Install Python dependencies:
+
+```bash
 pip install -r requirements.txt
+```
 
-# Install Playwright browser binaries (for dynamic analysis)
+6. Install Playwright browsers:
+
+```bash
 python setup_playwright.py
+```
 
-# Start the server
+7. Create or edit `server/.env` with your values:
+
+```env
+MONGODB_URI=mongodb+srv://USERNAME:PASSWORD@cluster0.xcfdaes.mongodb.net/accessibility-analyzer?retryWrites=true&w=majority
+MONGODB_DB_NAME=accessibility-analyzer
+GEMINI_API_KEY=your_gemini_api_key
+SECRET_KEY=your_long_random_secret
+RESET_EMAIL_COOLDOWN_MINUTES=2
+```
+
+8. Start the backend:
+
+```bash
 uvicorn main:app --reload
 ```
 
-The server will be available at http://localhost:8000.
+9. Confirm the backend is running at:
 
-#### 3. Set up the client
+```text
+http://127.0.0.1:8000
+```
+
+## 2. Client Setup
+
+1. Open a second terminal in the project root.
+2. Go to the client folder:
 
 ```bash
-cd ../client
+cd client
+```
 
-# Install dependencies
+3. Install frontend dependencies:
+
+```bash
 npm install
+```
 
-# Create .env file
-echo "VITE_API_URL=http://localhost:8000" > .env
-echo "VITE_APP_ENV=development" >> .env
+4. Create or edit `client/.env`:
 
-# Start the development server
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+5. Start the frontend:
+
+```bash
 npm run dev
 ```
 
-The client will be available at http://localhost:5173.
+6. Open the app in your browser:
 
-## Usage
+```text
+http://localhost:5173
+```
 
-1. Access the application at http://localhost:5173
-2. Choose an input method:
-   - Enter a URL
-   - Upload an HTML file
-   - Paste HTML code directly
-3. Click "Analyze" to start the accessibility analysis
-4. Review the detailed report with accessibility issues and recommendations
+## 3. How To Use
 
-## License
+1. Open the frontend in your browser.
+2. Log in or use the demo login.
+3. Enter a URL, upload an HTML file, or paste HTML code.
+4. Click scan/analyze.
+5. View results and export them if needed.
 
-[MIT License](LICENSE)
+## 4. MongoDB Atlas URI
 
-## Acknowledgments
+If you need to find or update your connection string:
 
-- [axe-core](https://github.com/dequelabs/axe-core) - Accessibility testing engine
-- [Playwright](https://playwright.dev/) - Browser automation library
-- [FastAPI](https://fastapi.tiangolo.com/) - Web framework for building APIs
-- [React](https://reactjs.org/) - JavaScript library for building user interfaces
-- [Material-UI](https://mui.com/) - React UI framework
+1. Open MongoDB Atlas.
+2. Go to your cluster.
+3. Click `Connect`.
+4. Choose `Drivers`.
+5. Copy the `mongodb+srv://...` connection string.
+6. Replace the username and password with your Atlas database user.
+7. Paste it into `server/.env` as `MONGODB_URI`.
+
+If your password has special characters like `@`, `#`, `/`, or `:`, URL-encode them first.
+
+## 5. Common Issues
+
+- If the backend fails on startup, check that `MONGODB_URI` is set correctly.
+- If Playwright setup fails, rerun `python setup_playwright.py`.
+- If the client cannot reach the server, make sure `VITE_API_URL` points to the backend.
+- If AI features fail, verify `GEMINI_API_KEY`.
+
+## 6. Notes
+
+- `server/.env` and `client/.env` are ignored by git.
+- The backend stores analysis history in MongoDB.
+- The analysis step can take a while because it launches a browser and runs accessibility checks.

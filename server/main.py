@@ -90,7 +90,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "WebForAll is running 🚀"}
+    return {"status": "ok", "message": "WebForAll is running"}
 
 @app.get("/favicon.ico")
 async def favicon():
@@ -454,6 +454,52 @@ async def ai_explain_issue(request: ExplainRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI service error: {str(e)}"
         )
+@app.post("/ai/summary", tags=["AI"])
+async def ai_summary(request: dict):
+    """Generate a simple summary for accessibility results."""
+    try:
+        results = request.get("results", {}) if isinstance(request, dict) else {}
+        violations = results.get("violations", []) if isinstance(results, dict) else []
+        passes = results.get("passes", []) if isinstance(results, dict) else []
+        incomplete = results.get("incomplete", []) if isinstance(results, dict) else []
+        inapplicable = results.get("inapplicable", []) if isinstance(results, dict) else []
+
+        severity_counts = {"critical": 0, "serious": 0, "moderate": 0, "minor": 0}
+        for violation in violations:
+            impact = (violation.get("impact") or "").lower()
+            if impact in severity_counts:
+                severity_counts[impact] += 1
+
+        total_issues = len(violations)
+        score = max(
+            0,
+            100
+            - (severity_counts["critical"] * 20)
+            - (severity_counts["serious"] * 12)
+            - (severity_counts["moderate"] * 6)
+            - (severity_counts["minor"] * 2),
+        )
+
+        return {
+            "summary": (
+                f"Found {total_issues} violations, {len(passes)} passes, "
+                f"{len(incomplete)} incomplete checks, and {len(inapplicable)} inapplicable checks."
+            ),
+            "score": score,
+            "counts": {
+                "violations": total_issues,
+                "passes": len(passes),
+                "incomplete": len(incomplete),
+                "inapplicable": len(inapplicable),
+            },
+            "severity": severity_counts,
+        }
+    except Exception as e:
+        logger.error(f"AI summary error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI summary error: {str(e)}"
+        )
 
 # ============================================================================
 # HEALTH CHECK
@@ -569,3 +615,4 @@ def playwright_health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
+

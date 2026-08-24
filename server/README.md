@@ -37,7 +37,15 @@ pip install -r requirements.txt
 python setup_playwright.py
 ```
 
-4. Verify the installation:
+4. Set required environment variables before starting the app:
+
+```bash
+set MONGODB_URI=your_mongodb_connection_string
+set MONGODB_DB_NAME=webforall
+set GEMINI_API_KEY=your_gemini_api_key
+```
+
+5. Verify the installation:
 
 ```bash
 python test_playwright.py
