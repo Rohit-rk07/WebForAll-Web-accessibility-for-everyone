@@ -12,6 +12,19 @@ const authHeaders = (extraHeaders = {}) => {
   };
 };
 
+// Debounce utility function
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 export const apiJson = async (path, options = {}) => {
   const response = await fetch(buildUrl(path), {
     ...options,
@@ -63,8 +76,14 @@ export const apiDelete = async (path, options = {}) => {
   return apiJson(path, { ...options, method: 'DELETE' });
 };
 
+// Debounced versions for frequently called endpoints
+export const apiJsonDebounced = debounce(apiJson, 300);
+export const apiFormDebounced = debounce(apiForm, 300);
+
 export default {
   apiJson,
   apiForm,
-  apiDelete
+  apiDelete,
+  apiJsonDebounced,
+  apiFormDebounced
 };

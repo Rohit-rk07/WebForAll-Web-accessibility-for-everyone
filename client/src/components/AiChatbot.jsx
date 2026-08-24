@@ -23,7 +23,7 @@ import aiService from '../services/aiService';
  * Global AI Chatbot component
  * Can be used across the app to provide AI assistance
  */
-const AiChatbot = () => {
+const AiChatbot = React.memo(() => {
   const theme = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -365,6 +365,6 @@ const AiChatbot = () => {
       </Box>
     </>
   );
-};
+});
 
 export default AiChatbot;

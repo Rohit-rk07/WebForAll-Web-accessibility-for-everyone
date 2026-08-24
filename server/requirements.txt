@@ -20,6 +20,7 @@ flake8==7.0.0
 google-generativeai==0.3.2
 python-dotenv==1.0.0
 dnspython==2.6.1
+gunicorn==21.2.0
 
 # MongoDB drivers (pinned for compatibility)
 pymongo==4.9.2

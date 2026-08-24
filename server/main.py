@@ -14,7 +14,11 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 import uvicorn
 
 # Import our modular components
@@ -101,6 +105,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add GZip compression for responses > 1000 bytes
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Add caching middleware for static responses
+class CacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        
+        # Add caching headers for static-like responses
+        if request.url.path in ["/", "/favicon.ico", "/health"]:
+            response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes
+        elif request.url.path.startswith("/history") and request.method == "GET":
+            response.headers["Cache-Control"] = "private, max-age=60"  # 1 minute for history
+        
+        return response
+
+app.add_middleware(CacheMiddleware)
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -541,15 +563,31 @@ async def health_check():
 # ============================================================================
 
 @app.get("/history", tags=["History"])
-async def list_history(limit: int = 50, current_user: User = Depends(get_current_active_user)):
-    """List recent analyses for the current user."""
-    cursor = analyses_col.find({"owner_email": current_user.email}).sort("created_at", -1).limit(max(1, min(limit, 200)))
+async def list_history(limit: int = 50, skip: int = 0, current_user: User = Depends(get_current_active_user)):
+    """List recent analyses for the current user with pagination."""
+    # Validate and clamp parameters
+    limit = max(1, min(limit, 100))  # Max 100 items per page
+    skip = max(0, skip)
+    
+    cursor = analyses_col.find({"owner_email": current_user.email}).sort("created_at", -1).skip(skip).limit(limit)
     items = []
     async for doc in cursor:
         doc["id"] = str(doc.get("_id"))
         doc.pop("_id", None)
         items.append(doc)
-    return {"items": items}
+    
+    # Get total count for pagination metadata
+    total_count = await analyses_col.count_documents({"owner_email": current_user.email})
+    
+    return {
+        "items": items,
+        "pagination": {
+            "total": total_count,
+            "limit": limit,
+            "skip": skip,
+            "has_more": skip + limit < total_count
+        }
+    }
 
 @app.get("/history/{item_id}", tags=["History"])
 async def get_history_item(item_id: str, current_user: User = Depends(get_current_active_user)):
