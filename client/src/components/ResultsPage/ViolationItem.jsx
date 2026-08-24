@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import {
   Accordion,
   AccordionSummary,
@@ -377,4 +377,4 @@ ${aiSuggestion.fixedCode}
   );
 };
 
-export default ViolationItem;
+export default memo(ViolationItem);

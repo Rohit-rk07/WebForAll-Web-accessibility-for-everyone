@@ -3,9 +3,7 @@ import { Box, Button, TextField, Typography, Tooltip } from '@mui/material';
 import { HelpOutline } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
 import { useNavigate } from 'react-router-dom';
-
-// API base URL from environment or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiJson } from '../../services/apiClient';
 
 // Default WCAG options
 const DEFAULT_WCAG_OPTIONS = {
@@ -39,15 +37,6 @@ const HTMLCodeTab = ({
   const [wcagOptions, setWcagOptions] = useState(DEFAULT_WCAG_OPTIONS);
   const navigate = useNavigate();
 
-  const saveToHistory = (report) => {
-    const history = JSON.parse(localStorage.getItem('historyReports') || '[]');
-    const filtered = history.filter(r => r.id !== report.id);
-    localStorage.setItem('historyReports', JSON.stringify([
-      { ...report, date: new Date().toISOString() },
-      ...filtered
-    ]));
-  };
-
   /**
    * Submits HTML content for analysis
    */
@@ -59,25 +48,13 @@ const HTMLCodeTab = ({
     clearError();
     
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE_URL}/analyze/html`, {
+      const result = await apiJson('/analyze/html', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
         body: JSON.stringify({ 
           content: htmlContent,
           wcag_options: wcagOptions
-        }),
+        })
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to analyze HTML');
-      }
-      
-      const result = await response.json();
 
       // If the server persisted analysis and returned an id, navigate to results page
       if (result && result.id) {
@@ -96,7 +73,6 @@ const HTMLCodeTab = ({
         score: result?.score || (result?.results && result?.results?.score) || 0,
         issues: result?.issues || (result?.results && result?.results?.issues) || { errors: 0, warnings: 0, notices: 0 },
       };
-      saveToHistory(formattedResult);
       onAnalyze(formattedResult);
     } catch (err) {
       console.error('Analysis error:', err);

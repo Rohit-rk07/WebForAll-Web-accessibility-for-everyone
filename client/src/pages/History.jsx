@@ -32,9 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiDelete, apiJson } from '../services/apiClient';
 
 /**
  * Get severity level based on score
@@ -73,22 +71,20 @@ const History = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE_URL}/history?limit=100`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to load history (${res.status})`);
-        }
-        const data = await res.json();
+        const data = await apiJson('/history?limit=100');
         const items = Array.isArray(data.items) ? data.items : [];
-        // Normalize to table shape
         const mapped = items.map((it, idx) => ({
           id: it.id || String(idx),
           url: it.input_ref || '',
-          name: it.input_type === 'url' ? new URL(it.input_ref || '', window.location.origin).hostname : it.input_type,
+          name: it.input_type === 'url'
+            ? (() => {
+                try {
+                  return new URL(it.input_ref || '').hostname;
+                } catch {
+                  return it.input_ref || 'Unknown URL';
+                }
+              })()
+            : (it.input_type || 'analysis'),
           date: it.created_at || null,
           violations_count: typeof it.violations_count === 'number' ? it.violations_count : 0,
         }));
@@ -165,12 +161,7 @@ const History = () => {
   const handleConfirmDelete = async () => {
     if (!currentReport) return;
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_BASE_URL}/history/${currentReport.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete');
+      await apiDelete(`/history/${currentReport.id}`);
       const updated = reports.filter(r => r.id !== currentReport.id);
       setReports(updated);
       setDeleteDialogOpen(false);

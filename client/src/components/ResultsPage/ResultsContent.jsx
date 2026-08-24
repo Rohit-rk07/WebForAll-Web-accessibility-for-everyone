@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -40,19 +40,22 @@ const ResultsContent = ({
   const [needsReviewLoading, setNeedsReviewLoading] = useState({});
   const [needsReviewResponse, setNeedsReviewResponse] = useState({});
 
-  // Get severity configuration
-  const icons = {
+  const icons = useMemo(() => ({
     ErrorOutline: (props) => <ErrorOutline {...props} />,
     WarningAmber: (props) => <WarningAmber {...props} />,
     InfoOutlined: (props) => <InfoOutlined {...props} />,
     CheckCircleOutline: (props) => <CheckCircleOutline {...props} />
-  };
-  const { severityMap } = getSeverityConfig(theme, icons);
+  }), []);
+  const { severityMap } = useMemo(() => getSeverityConfig(theme, icons), [theme, icons]);
+  const violations = useMemo(() => extractAxeResults(result, 'violations'), [result]);
+  const passes = useMemo(() => extractAxeResults(result, 'passes'), [result]);
+  const incomplete = useMemo(() => extractAxeResults(result, 'incomplete'), [result]);
+  const inapplicable = useMemo(() => extractAxeResults(result, 'inapplicable'), [result]);
 
   /**
    * Handle Needs Review button click
    */
-  const handleNeedsReview = async (issue, index) => {
+  const handleNeedsReview = useCallback(async (issue, index) => {
     setNeedsReviewLoading(prev => ({ ...prev, [index]: true }));
     
     try {
@@ -70,14 +73,12 @@ const ResultsContent = ({
     } finally {
       setNeedsReviewLoading(prev => ({ ...prev, [index]: false }));
     }
-  };
+  }, []);
 
   /**
    * Render Violations Tab
    */
   const renderViolations = () => {
-    const violations = extractAxeResults(result, 'violations');
-    
     if (violations.length === 0) {
       return (
         <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: theme.palette.success.light + '20' }}>
@@ -114,8 +115,6 @@ const ResultsContent = ({
    * Render Passes Tab
    */
   const renderPasses = () => {
-    const passes = extractAxeResults(result, 'passes');
-    
     if (passes.length === 0) {
       return (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -187,8 +186,6 @@ const ResultsContent = ({
    * Render Incomplete Tab
    */
   const renderIncomplete = () => {
-    const incomplete = extractAxeResults(result, 'incomplete');
-    
     if (incomplete.length === 0) {
       return (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -332,8 +329,6 @@ const ResultsContent = ({
    * Render Inapplicable Tab
    */
   const renderInapplicable = () => {
-    const inapplicable = extractAxeResults(result, 'inapplicable');
-    
     if (inapplicable.length === 0) {
       return (
         <Paper sx={{ p: 4, textAlign: 'center' }}>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Paper, CircularProgress, Typography, Alert, AlertTitle, Stepper, Step, StepLabel, useTheme } from '@mui/material';
+import { Box, Paper, CircularProgress, Typography, Alert, AlertTitle, useTheme } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import UploadCard from '../components/UploadCard';
 
@@ -20,15 +20,7 @@ const DashboardHome = () => {
   // State management
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeStep, setActiveStep] = useState(0);
   const navigate = useNavigate();
-
-  // Analysis steps for loading state
-  const steps = [
-    'Processing input',
-    'Analyzing accessibility',
-    'Generating report'
-  ];
 
   /**
    * Handles accessibility analysis results
@@ -53,42 +45,6 @@ const DashboardHome = () => {
   const clearError = () => {
     setError(null);
   };
-
-  /**
-   * Simulates analysis progress steps
-   * This would be called when analysis starts
-   */
-  const simulateProgress = () => {
-    setActiveStep(0);
-    
-    // Simulate step progression
-    const stepInterval = setInterval(() => {
-      setActiveStep(prevStep => {
-        const nextStep = prevStep + 1;
-        if (nextStep >= steps.length) {
-          clearInterval(stepInterval);
-          return prevStep;
-        }
-        return nextStep;
-      });
-    }, 1500); // Progress to next step every 1.5 seconds
-    
-    return () => clearInterval(stepInterval);
-  };
-
-  // Start progress simulation when loading changes to true
-  React.useEffect(() => {
-    let cleanup = () => {};
-    
-    if (loading) {
-      cleanup = simulateProgress();
-      setActiveStep(0);
-    } else {
-      setActiveStep(0);
-    }
-    
-    return cleanup;
-  }, [loading]);
 
   return (
     <Paper
@@ -134,25 +90,11 @@ const DashboardHome = () => {
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, py: 4 }}>
             <CircularProgress size={60} sx={{ color: COLORS.primary }} />
-            
             <Typography variant="h6" color={COLORS.text} sx={{ mt: 1 }}>
               Analyzing Accessibility
             </Typography>
-            
-            <Box sx={{ width: '100%', maxWidth: 600, mt: 2 }}>
-              <Stepper activeStep={activeStep} alternativeLabel>
-                {steps.map((label) => (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-            </Box>
-            
             <Typography variant="body2" color={COLORS.text} sx={{ mt: 2, textAlign: 'center' }}>
-              {activeStep === 0 && "Processing your content and preparing for analysis..."}
-              {activeStep === 1 && "Running comprehensive accessibility checks against WCAG standards..."}
-              {activeStep === 2 && "Generating detailed accessibility report with recommendations..."}
+              Running accessibility checks against WCAG standards...
             </Typography>
           </Box>
         </Paper>

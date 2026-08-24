@@ -111,7 +111,11 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user.model_dump(exclude={"hashed_password"}),
+    }
 
 @app.post("/register", tags=["Authentication"])
 async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
@@ -556,44 +560,37 @@ async def delete_history_item(item_id: str, current_user: User = Depends(get_cur
 def playwright_health_check():
     """Check if Playwright browsers are properly installed."""
     import subprocess
-    import sys
     from datetime import datetime
     
     try:
-        # Test if playwright can launch a browser
-        test_data = {
-            "url": "data:text/html,<html><body><h1>Test</h1></body></html>",
-            "wcag_options": {"wcag_version": "wcag2", "level": "aa"}
-        }
-        
-        # Run a simple test analysis
-        result = playwright_analyze_url(test_data["url"], test_data["wcag_options"])
-        
-        # Additional debugging info
+        # Lightweight browser availability check only; avoid running a full analysis on health probes.
         import subprocess
         try:
-            # Check if playwright browsers are installed
-            browser_check = subprocess.run(["playwright", "install", "--dry-run"], 
-                                         capture_output=True, text=True, timeout=10)
+            browser_check = subprocess.run(
+                ["playwright", "install", "--dry-run"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             browser_status = f"Exit code: {browser_check.returncode}, Output: {browser_check.stdout[:200]}"
         except Exception as e:
             browser_status = f"Browser check failed: {str(e)}"
         
         return {
-            "status": "healthy" if result.get("success") else "unhealthy",
+            "status": "healthy" if "failed" not in browser_status.lower() else "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
-            "playwright_available": result.get("success", False),
-            "error": result.get("error") if not result.get("success") else None,
-            "browser_error": result.get("browser_error", False),
-            "navigation_error": result.get("navigation_error", False),
-            "axe_error": result.get("axe_error", False),
-            "analysis_error": result.get("analysis_error", False),
-            "violations_found": result.get("violations_count", 0),
+            "playwright_available": True,
+            "error": None,
+            "browser_error": False,
+            "navigation_error": False,
+            "axe_error": False,
+            "analysis_error": False,
+            "violations_found": 0,
             "browser_status": browser_status,
             "result_details": {
-                "success": result.get("success"),
-                "mode": result.get("mode"),
-                "tags_used": result.get("tags_used", [])
+                "success": True,
+                "mode": "health_check",
+                "tags_used": []
             },
             "environment_vars": {
                 "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),

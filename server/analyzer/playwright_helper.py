@@ -6,7 +6,9 @@ import json
 import logging
 import traceback
 from typing import Dict, Any, List
+from functools import lru_cache
 
+import requests
 from playwright.sync_api import sync_playwright
 
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _PLAYWRIGHT = None
 _BROWSER = None
+_AXE_URL = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js"
 
 
 def get_wcag_tags(wcag_options: Dict[str, Any]) -> List[str]:
@@ -87,6 +90,18 @@ def get_browser():
     return _BROWSER
 
 
+@lru_cache(maxsize=1)
+def get_axe_source() -> str | None:
+    """Fetch and cache axe-core once per process to avoid repeated CDN requests."""
+    try:
+        response = requests.get(_AXE_URL, timeout=15)
+        response.raise_for_status()
+        return response.text
+    except Exception as exc:
+        logger.warning(f"Unable to cache axe-core source locally: {exc}")
+        return None
+
+
 def close_browser():
     global _PLAYWRIGHT, _BROWSER
 
@@ -137,14 +152,17 @@ def run_analysis(data: Dict[str, Any]):
             page.goto(url, wait_until="domcontentloaded", timeout=45000)
 
             logger.info("Waiting for page to settle...")
-            page.wait_for_timeout(300)
             try:
-                page.wait_for_load_state("networkidle", timeout=3000)
+                page.wait_for_load_state("networkidle", timeout=1500)
             except Exception:
                 logger.info("Skipping networkidle wait because the page stayed busy")
 
             logger.info("Injecting axe-core library...")
-            page.add_script_tag(url="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js")
+            axe_source = get_axe_source()
+            if axe_source:
+                page.add_script_tag(content=axe_source)
+            else:
+                page.add_script_tag(url=_AXE_URL)
             page.wait_for_function("typeof axe !== 'undefined'")
 
             logger.info(f"Running axe analysis with tags: {tags}")

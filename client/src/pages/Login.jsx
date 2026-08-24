@@ -239,19 +239,19 @@ const Login = () => {
               <Divider sx={{ flex: 1 }} />
             </Box>
             
-            <Button 
-              onClick={handleDemoLogin} 
-              variant="outlined" 
-              size="large" 
+            <Button
+              onClick={handleDemoLogin}
+              variant="outlined"
+              size="large"
               fullWidth
               disabled={isSubmitting}
-              sx={{ 
-                py: 1.5, 
+              sx={{
+                py: 1.5,
                 borderRadius: 2,
                 mt: 1
               }}
             >
-              Continue as Demo User
+              {isSubmitting ? <CircularProgress size={22} color="inherit" /> : 'Continue as Demo User'}
             </Button>
             
             {/* Sign Up Link */}

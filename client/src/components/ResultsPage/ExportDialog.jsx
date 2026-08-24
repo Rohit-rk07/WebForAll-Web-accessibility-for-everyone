@@ -10,7 +10,6 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
-import jsPDF from 'jspdf';
 import { extractAxeResults, calculateAccessibilityScore } from '../../utils/resultsUtils';
 
 // Constants
@@ -48,9 +47,7 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
     
     try {
       setLoading(true);
-      
-      // Debug: Log the result data structure
-      console.log('PDF Export - Result data:', result);
+      const { default: jsPDF } = await import('jspdf');
       
       const axeResults = {
         violations: extractAxeResults(result, 'violations'),
@@ -58,17 +55,14 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
         incomplete: extractAxeResults(result, 'incomplete'),
         inapplicable: extractAxeResults(result, 'inapplicable')
       };
-      
+
       const resultCounts = {
         violations: axeResults.violations?.length || 0,
         passes: axeResults.passes?.length || 0,
         incomplete: axeResults.incomplete?.length || 0,
         inapplicable: axeResults.inapplicable?.length || 0
       };
-      
-      // Debug: Log the extracted counts
-      console.log('PDF Export - Result counts:', resultCounts);
-      
+
       // Create PDF with proper document structure
       const pdf = new jsPDF(PDF_CONFIG);
       
@@ -177,9 +171,6 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
       pdf.setTextColor(...COLORS.text);
       pdf.text(`Overall Accessibility Score: ${actualScore}/100`, margin, yPosition);
       yPosition += 10;
-      
-      // Debug: Log score calculation
-      console.log('PDF Export - Score calculation:', { scoreData, score, actualScore });
       
       // Score interpretation
       let scoreInterpretation = '';
@@ -445,7 +436,6 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
       const filename = `accessibility-report-${date}.pdf`;
       pdf.save(filename);
       
-      console.log('PDF export completed successfully');
       onClose();
     } catch (error) {
       console.error('Error generating PDF:', error);

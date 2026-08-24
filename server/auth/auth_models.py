@@ -7,6 +7,7 @@ class Token(BaseModel):
     """Token response model."""
     access_token: str
     token_type: str
+    user: Optional["User"] = None
 
 class TokenData(BaseModel):
     """Token data model."""
@@ -50,3 +51,6 @@ class PasswordReset(BaseModel):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         return v
+
+
+Token.model_rebuild()

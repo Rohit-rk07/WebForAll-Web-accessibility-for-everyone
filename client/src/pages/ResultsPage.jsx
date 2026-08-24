@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Box, 
   Paper, 
@@ -24,16 +24,14 @@ import { useTheme } from '@mui/material/styles';
 import ScoreCard from '../components/ResultsPage/ScoreCard';
 import ResultsTabs from '../components/ResultsPage/ResultsTabs';
 import ResultsContent from '../components/ResultsPage/ResultsContent';
-import ExportDialog from '../components/ResultsPage/ExportDialog';
+const ExportDialog = lazy(() => import('../components/ResultsPage/ExportDialog'));
 
 // Import utility functions
 import { 
   calculateAccessibilityScore, 
   calculateResultCounts 
 } from '../utils/resultsUtils';
-
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiJson } from '../services/apiClient';
 
 /**
  * Results Page component
@@ -41,7 +39,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
  * Now modularized into smaller, manageable components
  */
 const ResultsPage = () => {
-  const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
   const [result, setResult] = useState(null);
@@ -64,22 +61,11 @@ const ResultsPage = () => {
         return;
       }
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE_URL}/history/${id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to load results (${res.status})`);
-        }
-        const doc = await res.json();
-        const analyzed = doc.result || doc; // fallback if server didn't persist full result
+        const doc = await apiJson(`/history/${id}`);
+        const analyzed = doc.result || doc;
         setResult(analyzed);
-        // Derive analyzed URL reliably from server document
-        const urlFromResult = analyzed?.url || analyzed?.pageUrl;
-        const urlFromDoc = doc?.input_type === 'url' ? doc?.input_ref : undefined;
-        setAnalyzedUrl(urlFromResult || urlFromDoc || '');
+        const analyzedUrlValue = analyzed?.url || analyzed?.pageUrl || (doc?.input_type === 'url' ? doc?.input_ref : '');
+        setAnalyzedUrl(analyzedUrlValue || '');
         const scoreData = calculateAccessibilityScore(analyzed);
         setScore(scoreData.score);
         setTotalIssues(scoreData.totalIssues);
@@ -225,12 +211,14 @@ const ResultsPage = () => {
       </Box>
 
       {/* Export Dialog */}
-      <ExportDialog
-        open={exportDialogOpen}
-        onClose={handleCloseExportDialog}
-        result={result}
-        resultsRef={resultsRef}
-      />
+      <Suspense fallback={null}>
+        <ExportDialog
+          open={exportDialogOpen}
+          onClose={handleCloseExportDialog}
+          result={result}
+          resultsRef={resultsRef}
+        />
+      </Suspense>
     </Box>
   );
 };

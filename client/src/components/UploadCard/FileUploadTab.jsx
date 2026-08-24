@@ -4,9 +4,7 @@ import { CloudUpload, Delete } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
 import { useTheme } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-
-// API base URL from environment or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiForm } from '../../services/apiClient';
 
 // Default WCAG options
 const DEFAULT_WCAG_OPTIONS = {
@@ -115,21 +113,7 @@ const FileUploadTab = ({
       formData.append('file', file);
       formData.append('wcag_options', JSON.stringify(wcagOptions));
       
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE_URL}/analyze/file`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to analyze file');
-      }
-      
-      const result = await response.json();
+      const result = await apiForm('/analyze/file', formData);
 
       if (result && result.id) {
         navigate(`/dashboard/results/${result.id}`);

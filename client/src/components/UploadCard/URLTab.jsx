@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiJson } from '../../services/apiClient';
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { Search } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
-
-// API base URL from environment or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Default WCAG options
 const DEFAULT_WCAG_OPTIONS = {
@@ -45,26 +43,14 @@ const URLTab = ({ onAnalyze, setIsLoading, isLoading, colors, onError = () => {}
     clearError();
     
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE_URL}/analyze/url`, {
+      const result = await apiJson('/analyze/url', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
         body: JSON.stringify({ 
           url,
           wcag_options: wcagOptions
-        }),
+        })
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to analyze URL');
-      }
-      
-      const result = await response.json();
-      
+
       // Format the result to ensure it has the expected structure
       const formattedResult = {
         ...result,

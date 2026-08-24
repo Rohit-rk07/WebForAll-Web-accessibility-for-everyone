@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import { Box, Typography, Paper, CircularProgress, Alert, AlertTitle, Container, useTheme, Button } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +19,7 @@ const Home = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
   const theme = useTheme();
   const navigate = useNavigate();
   const {demoLogin} = useAuth();
@@ -38,15 +39,19 @@ const Home = () => {
     setResult(formattedResult);
   };
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = useCallback(async () => {
+    if (demoLoading) return;
+    setDemoLoading(true);
     try {
       await demoLogin();
       navigate('/dashboard/home');
     } catch (e) {
       // Optional: surface an error UI if demo login fails
       console.error('Demo login failed', e);
+    } finally {
+      setDemoLoading(false);
     }
-  };
+  }, [demoLogin, navigate, demoLoading]);
 
   /**
    * Clears any error messages
@@ -436,6 +441,7 @@ const Home = () => {
             <Button 
               variant="contained" 
               size="large"
+              disabled={demoLoading}
               sx={{ 
                 bgcolor: theme.palette.primary.main,
                 color: 'white',
@@ -453,7 +459,7 @@ const Home = () => {
               }}
               onClick={handleDemoLogin}
             >
-              Continue as Demo User
+              {demoLoading ? <CircularProgress size={22} color="inherit" /> : 'Continue as Demo User'}
             </Button>
         </Box>
       </Container>

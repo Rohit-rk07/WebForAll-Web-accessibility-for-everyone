@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-// API base URL from environment or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiForm, apiJson } from '../services/apiClient';
 
 // Create context
 const AuthContext = createContext(null);
@@ -31,14 +29,12 @@ export const AuthProvider = ({ children, value }) => {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/users/me`, {
+        const userData = await apiJson('/users/me', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
-
-        if (response.ok) {
-          const userData = await response.json();
+        if (userData) {
           setUser(userData);
         } else {
           // Token is invalid or expired
@@ -65,36 +61,25 @@ export const AuthProvider = ({ children, value }) => {
 
 
       
-      const response = await fetch(`${API_BASE_URL}/token`, {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Login failed:', data);
-        throw new Error(data.detail || 'Login failed');
-      }
+      const data = await apiForm('/token', formData);
       
       // Store token
       localStorage.setItem('accessToken', data.access_token);
-      
-      // Get user info
-      const userResponse = await fetch(`${API_BASE_URL}/users/me`, {
+
+      // Prefer the user payload returned by /token to avoid an extra round trip.
+      if (data.user) {
+        setUser(data.user);
+        return data.user;
+      }
+
+      // Fallback for older responses or nonstandard auth proxies.
+      const userData = await apiJson('/users/me', {
         headers: {
-          'Authorization': `Bearer ${data.access_token}`
+          Authorization: `Bearer ${data.access_token}`
         }
       });
-      
-      if (!userResponse.ok) {
-        const userError = await userResponse.json();
-        throw new Error(userError.detail || 'Failed to get user info');
-      }
-      
-      const userData = await userResponse.json();
       setUser(userData);
-      
+
       return userData;
     } catch (err) {
       setError(err.message);
@@ -106,31 +91,14 @@ export const AuthProvider = ({ children, value }) => {
   const register = async ({ email, fullName, password }) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
+      const responseData = await apiJson('/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           email,
           full_name: fullName,
           password
         })
       });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        console.error('Registration failed:', responseData);
-        // Check for validation errors
-        if (response.status === 422 && responseData.detail) {
-          throw new Error(responseData.detail);
-        } else if (responseData.detail) {
-          throw new Error(responseData.detail);
-        } else {
-          throw new Error('Registration failed. Please try again.');
-        }
-      }
       
       // Auto login after registration
       try {
@@ -151,21 +119,10 @@ export const AuthProvider = ({ children, value }) => {
   const forgotPassword = async (email) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/forgot-password`, {
+      return await apiJson('/forgot-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ email })
       });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to process request');
-      }
-      
-      return data;
     } catch (err) {
       setError(err.message);
       throw err;
@@ -176,24 +133,13 @@ export const AuthProvider = ({ children, value }) => {
   const resetPassword = async (token, newPassword) => {
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/reset-password`, {
+      return await apiJson('/reset-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           token,
           new_password: newPassword
         })
       });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to reset password');
-      }
-      
-      return data;
     } catch (err) {
       setError(err.message);
       throw err;

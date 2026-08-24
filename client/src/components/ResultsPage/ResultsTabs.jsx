@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import {
   Tabs,
   Tab,
@@ -16,12 +16,12 @@ import {
  * Results Tabs Component
  * Handles navigation between different result categories
  */
-const ResultsTabs = ({ 
-  activeTab, 
-  onTabChange, 
-  resultCounts 
+const ResultsTabs = memo(({
+  activeTab,
+  onTabChange,
+  resultCounts
 }) => {
-  const tabs = [
+  const tabs = useMemo(() => ([
     {
       label: 'Violations',
       icon: <ErrorOutline />,
@@ -46,12 +46,12 @@ const ResultsTabs = ({
       count: resultCounts.inapplicable,
       color: 'default'
     }
-  ];
+  ]), [resultCounts]);
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-      <Tabs 
-        value={activeTab} 
+      <Tabs
+        value={activeTab}
         onChange={onTabChange}
         variant="fullWidth"
         sx={{
@@ -62,9 +62,9 @@ const ResultsTabs = ({
           }
         }}
       >
-        {tabs.map((tab, index) => (
+        {tabs.map((tab) => (
           <Tab
-            key={index}
+            key={tab.label}
             icon={tab.icon}
             label={
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
@@ -86,6 +86,6 @@ const ResultsTabs = ({
       </Tabs>
     </Box>
   );
-};
+});
 
 export default ResultsTabs;

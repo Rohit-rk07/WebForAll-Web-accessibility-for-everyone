@@ -2,6 +2,30 @@
 
 Full-stack accessibility scanner with a React client and FastAPI server.
 
+## Quick Start
+
+1. Start MongoDB Atlas access and copy your connection string into `server/.env`.
+2. In one terminal:
+
+```bash
+cd server
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python setup_playwright.py
+uvicorn main:app --reload
+```
+
+3. In a second terminal:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+4. Open `http://localhost:5173`.
+
 ## Project Structure
 
 - `client/` - React + Vite frontend

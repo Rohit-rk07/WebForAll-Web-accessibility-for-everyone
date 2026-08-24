@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import AiChatbot from './components/AiChatbot';
+const AiChatbot = lazy(() => import('./components/AiChatbot'));
 
 // Lazy-loaded Pages
 const Home = lazy(() => import('./pages/Home'));
@@ -131,7 +131,9 @@ function AppContent() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-            <AiChatbot />
+            <Suspense fallback={null}>
+              <AiChatbot />
+            </Suspense>
           </BrowserRouter>
         </Box>
       </AuthProvider>
