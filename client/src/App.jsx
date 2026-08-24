@@ -4,20 +4,20 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-const AiChatbot = lazy(() => import('./components/AiChatbot'));
+const AiChatbot = lazy(() => import(/* webpackChunkName: "ai-chatbot" */ './components/AiChatbot'));
 
-// Lazy-loaded Pages
-const Home = lazy(() => import('./pages/Home'));
-const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
-const DashboardHome = lazy(() => import('./pages/DashboardHome'));
-const History = lazy(() => import('./pages/History'));
-const ResultsPage = lazy(() => import('./pages/ResultsPage'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+// Lazy-loaded Pages with webpack chunk names for better debugging
+const Home = lazy(() => import(/* webpackChunkName: "home" */ './pages/Home'));
+const Login = lazy(() => import(/* webpackChunkName: "login" */ './pages/Login'));
+const Signup = lazy(() => import(/* webpackChunkName: "signup" */ './pages/Signup'));
+const DashboardHome = lazy(() => import(/* webpackChunkName: "dashboard-home" */ './pages/DashboardHome'));
+const History = lazy(() => import(/* webpackChunkName: "history" */ './pages/History'));
+const ResultsPage = lazy(() => import(/* webpackChunkName: "results" */ './pages/ResultsPage'));
+const ForgotPassword = lazy(() => import(/* webpackChunkName: "forgot-password" */ './pages/ForgotPassword'));
+const ResetPassword = lazy(() => import(/* webpackChunkName: "reset-password" */ './pages/ResetPassword'));
 
 // Lazy-loaded Layouts
-const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
+const DashboardLayout = lazy(() => import(/* webpackChunkName: "dashboard-layout" */ './layouts/DashboardLayout'));
 
 /**
  * Protected Route Component

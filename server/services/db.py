@@ -11,7 +11,17 @@ if not MONGODB_URI:
     # Fail-fast is acceptable; caller should ensure env is set.
     raise RuntimeError("MONGODB_URI environment variable is not set")
 
-client = AsyncIOMotorClient(MONGODB_URI)
+# Configure connection pooling for better performance
+client = AsyncIOMotorClient(
+    MONGODB_URI,
+    maxPoolSize=50,  # Maximum connection pool size
+    minPoolSize=5,   # Minimum connections to maintain
+    maxIdleTimeMS=30000,  # Close idle connections after 30 seconds
+    serverSelectionTimeoutMS=30000,  # Server selection timeout (30s for Atlas)
+    connectTimeoutMS=10000,  # Connection timeout (10s for Atlas)
+    retryWrites=True,  # Retry write operations
+    w="majority"  # Write concern for data safety
+)
 db = client[DB_NAME]
 
 # Collections

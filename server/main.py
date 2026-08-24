@@ -51,21 +51,39 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Running on {platform.system()}")
     
-    # Initialize authentication system (indexes + seed)
-    await initialize_default_users()
-
-    logger.info("Authentication system initialized")
+    # Initialize authentication system (indexes + seed) in background
+    import asyncio
+    asyncio.create_task(initialize_default_users())
+    logger.info("Authentication system initialization started in background")
     
-    # Initialize AI services
+    # Initialize AI services in background
+    asyncio.create_task(initialize_gemini_async())
+    logger.info("AI services initialization started in background")
+    
+    yield
+    
+    # Shutdown - Clean up resources
+    logger.info("Application shutting down")
+    
+    # Close MongoDB connection
+    from services.db import client
+    client.close()
+    logger.info("MongoDB connection closed")
+    
+    # Close Playwright browser if running
+    try:
+        from analyzer.playwright_helper import close_browser
+        await close_browser()
+        logger.info("Playwright browser closed")
+    except Exception as e:
+        logger.warning(f"Error closing Playwright browser: {e}")
+
+async def initialize_gemini_async():
+    """Async wrapper for Gemini initialization."""
     if initialize_gemini():
         logger.info("AI services initialized successfully")
     else:
         logger.warning("AI services initialization failed")
-    
-    yield
-    
-    # Shutdown
-    logger.info("Application shutting down")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -240,7 +258,7 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
             }
         
         # Use dynamic analysis only
-        result = playwright_analyze_url(str(request.url), wcag_options)
+        result = await playwright_analyze_url(str(request.url), wcag_options)
         
         if result is None:
             raise HTTPException(
@@ -312,7 +330,7 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         data_url = f"data:text/html;base64,{html_b64}"
         
         # Use dynamic analysis with data URL
-        result = playwright_analyze_url(data_url, wcag_options)
+        result = await playwright_analyze_url(data_url, wcag_options)
         
         if result is None:
             raise HTTPException(
@@ -388,7 +406,7 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
         data_url = f"data:text/html;base64,{html_b64}"
         
         # Use dynamic analysis with data URL
-        result = playwright_analyze_url(data_url, parsed_wcag_options)
+        result = await playwright_analyze_url(data_url, parsed_wcag_options)
         
         if result is None:
             raise HTTPException(

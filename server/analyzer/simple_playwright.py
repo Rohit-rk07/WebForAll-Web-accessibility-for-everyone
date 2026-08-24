@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Import the helper implementation directly to avoid subprocess overhead.
 HELPER_SCRIPT = Path(__file__).parent / "playwright_helper.py"
 
-def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
+async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
     """
     Analyze a URL for accessibility issues using Playwright in a separate process.
     
@@ -42,7 +42,7 @@ def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
             "url": url,
             "wcag_options": wcag_options or {}
         }
-        return run_analysis(data)
+        return await run_analysis(data)
     except Exception as e:
         logger.error(f"Error analyzing URL: {e}")
         import traceback

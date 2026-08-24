@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from functools import lru_cache
 
 import requests
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def get_wcag_tags(wcag_options: Dict[str, Any]) -> List[str]:
     return tags
 
 
-def get_browser():
+async def get_browser():
     global _PLAYWRIGHT, _BROWSER
 
     if _BROWSER is not None:
@@ -85,36 +85,38 @@ def get_browser():
         "--disable-default-apps",
     ]
 
-    _PLAYWRIGHT = sync_playwright().start()
-    _BROWSER = _PLAYWRIGHT.chromium.launch(headless=True, args=browser_args)
+    _PLAYWRIGHT = await async_playwright().start()
+    _BROWSER = await _PLAYWRIGHT.chromium.launch(headless=True, args=browser_args)
     return _BROWSER
 
 
 @lru_cache(maxsize=1)
-def get_axe_source() -> str | None:
+async def get_axe_source() -> str | None:
     """Fetch and cache axe-core once per process to avoid repeated CDN requests."""
     try:
-        response = requests.get(_AXE_URL, timeout=15)
-        response.raise_for_status()
-        return response.text
+        import aiohttp
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+            async with session.get(_AXE_URL) as response:
+                response.raise_for_status()
+                return await response.text()
     except Exception as exc:
         logger.warning(f"Unable to cache axe-core source locally: {exc}")
         return None
 
 
-def close_browser():
+async def close_browser():
     global _PLAYWRIGHT, _BROWSER
 
     if _BROWSER is not None:
-        _BROWSER.close()
+        await _BROWSER.close()
         _BROWSER = None
 
     if _PLAYWRIGHT is not None:
-        _PLAYWRIGHT.stop()
+        await _PLAYWRIGHT.stop()
         _PLAYWRIGHT = None
 
 
-def run_analysis(data: Dict[str, Any]):
+async def run_analysis(data: Dict[str, Any]):
     import os
     import traceback
 
@@ -131,7 +133,7 @@ def run_analysis(data: Dict[str, Any]):
         logger.info(f"Environment: PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH', 'Not set')}")
 
         try:
-            browser = get_browser()
+            browser = await get_browser()
         except Exception as browser_error:
             logger.error(f"Failed to launch browser: {browser_error}")
             return {
@@ -145,28 +147,28 @@ def run_analysis(data: Dict[str, Any]):
         page = None
         try:
             logger.info("Creating browser context...")
-            context = browser.new_context(viewport={"width": 1280, "height": 720})
-            page = context.new_page()
+            context = await browser.new_context(viewport={"width": 1280, "height": 720})
+            page = await context.new_page()
 
             logger.info(f"Navigating to URL: {url}")
-            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
 
             logger.info("Waiting for page to settle...")
             try:
-                page.wait_for_load_state("networkidle", timeout=1500)
+                await page.wait_for_load_state("networkidle", timeout=1500)
             except Exception:
                 logger.info("Skipping networkidle wait because the page stayed busy")
 
             logger.info("Injecting axe-core library...")
-            axe_source = get_axe_source()
+            axe_source = await get_axe_source()
             if axe_source:
-                page.add_script_tag(content=axe_source)
+                await page.add_script_tag(content=axe_source)
             else:
-                page.add_script_tag(url=_AXE_URL)
-            page.wait_for_function("typeof axe !== 'undefined'")
+                await page.add_script_tag(url=_AXE_URL)
+            await page.wait_for_function("typeof axe !== 'undefined'")
 
             logger.info(f"Running axe analysis with tags: {tags}")
-            results = page.evaluate(
+            results = await page.evaluate(
                 f"""() => {{
                     return new Promise((resolve, reject) => {{
                         try {{
@@ -200,9 +202,9 @@ def run_analysis(data: Dict[str, Any]):
             }
         finally:
             if page is not None:
-                page.close()
+                await page.close()
             if context is not None:
-                context.close()
+                await context.close()
     except Exception as e:
         return {
             "success": False,
