@@ -34,30 +34,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { apiDelete, apiJson } from '../services/apiClient';
 
-/**
- * Get severity level based on score
- * @param {number} score - Accessibility score
- * @returns {Object} Severity level info
- */
-const getSeverityLevel = (score) => {
-  if (score >= 90) {
-    return { level: 'Excellent', color: 'success' };
-  } else if (score >= 80) {
-    return { level: 'Good', color: 'success' };
-  } else if (score >= 70) {
-    return { level: 'Fair', color: 'warning' };
-  } else if (score >= 60) {
-    return { level: 'Poor', color: 'warning' };
-  } else {
-    return { level: 'Critical', color: 'error' };
-  }
-};
-
 const History = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -90,7 +70,7 @@ const History = () => {
         }));
         setReports(mapped);
       } catch (e) {
-        setError(e.message);
+        console.error(e);
       } finally {
         setLoading(false);
       }

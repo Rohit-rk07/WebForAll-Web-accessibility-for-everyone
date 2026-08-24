@@ -52,7 +52,6 @@ export const getNormalizedSeverity = (issue) => {
 export const calculateAccessibilityScore = (resultData) => {
   // Extract violations and passes using standardized utility
   const violations = extractAxeResults(resultData, 'violations');
-  const passes = extractAxeResults(resultData, 'passes');
   
   // Calculate severity breakdown for violations using standardized mapping
   const severityCounts = violations.reduce((acc, issue) => {

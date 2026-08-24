@@ -7,14 +7,7 @@ const AuthContext = createContext(null);
 // Hook to access auth context
 export const useAuth = () => useContext(AuthContext);
 
-// Provider component
-export const AuthProvider = ({ children, value }) => {
-  // If value is provided from outside, use it
-  if (value) {
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-  }
-
-  // Otherwise, create our own state
+const AuthProviderInner = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -178,4 +171,13 @@ export const AuthProvider = ({ children, value }) => {
   };
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
-}; 
+};
+
+// Provider component
+export const AuthProvider = ({ children, value }) => {
+  if (value) {
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  }
+
+  return <AuthProviderInner>{children}</AuthProviderInner>;
+};

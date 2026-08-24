@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Box, 
@@ -43,10 +43,6 @@ const ResultsPage = () => {
   const theme = useTheme();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [score, setScore] = useState(0);
-  const [totalIssues, setTotalIssues] = useState(0);
-  const [severityCounts, setSeverityCounts] = useState({ critical: 0, serious: 0, moderate: 0, minor: 0 });
-  const [resultCounts, setResultCounts] = useState({ violations: 0, passes: 0, incomplete: 0, inapplicable: 0 });
   const [activeTab, setActiveTab] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const resultsRef = useRef(null);
@@ -66,12 +62,6 @@ const ResultsPage = () => {
         setResult(analyzed);
         const analyzedUrlValue = analyzed?.url || analyzed?.pageUrl || (doc?.input_type === 'url' ? doc?.input_ref : '');
         setAnalyzedUrl(analyzedUrlValue || '');
-        const scoreData = calculateAccessibilityScore(analyzed);
-        setScore(scoreData.score);
-        setTotalIssues(scoreData.totalIssues);
-        setSeverityCounts(scoreData.severityCounts);
-        const counts = calculateResultCounts(analyzed);
-        setResultCounts(counts);
         setLoading(false);
       } catch (e) {
         console.error(e);
@@ -81,35 +71,41 @@ const ResultsPage = () => {
     loadById();
   }, [id, navigate]);
 
+  const scoreData = useMemo(() => calculateAccessibilityScore(result), [result]);
+  const resultCounts = useMemo(() => calculateResultCounts(result), [result]);
+  const score = scoreData.score;
+  const totalIssues = scoreData.totalIssues;
+  const severityCounts = scoreData.severityCounts;
+
   /**
    * Handle tab change
    * @param {Event} event - Change event
    * @param {number} newValue - New tab index
    */
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = useCallback((event, newValue) => {
     setActiveTab(newValue);
-  };
+  }, []);
 
   /**
    * Opens the export options dialog
    */
-  const handleExportClick = () => {
+  const handleExportClick = useCallback(() => {
     setExportDialogOpen(true);
-  };
+  }, []);
 
   /**
    * Closes the export options dialog
    */
-  const handleCloseExportDialog = () => {
+  const handleCloseExportDialog = useCallback(() => {
     setExportDialogOpen(false);
-  };
+  }, []);
 
   /**
    * Navigate back to dashboard
    */
-  const handleBackClick = () => {
+  const handleBackClick = useCallback(() => {
     navigate('/dashboard/home');
-  };
+  }, [navigate]);
 
   if (loading) {
     return (

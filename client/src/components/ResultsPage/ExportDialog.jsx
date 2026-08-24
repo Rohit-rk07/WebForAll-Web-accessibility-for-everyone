@@ -311,7 +311,7 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
           if (violation.nodes && violation.nodes.length > 0) {
             addWrappedText(`Affected Element${violation.nodes.length > 1 ? 's' : ''}:`, 11, [0, 0, 0], 10);
             
-            violation.nodes.slice(0, 3).forEach((node, nodeIndex) => {
+            violation.nodes.slice(0, 3).forEach((node) => {
               if (node.html) {
                 addCodeBlock(node.html, 180);
               }
@@ -348,7 +348,7 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
         const displayPasses = axeResults.passes.slice(0, passesToShow);
         
         // Create a simple list with better formatting
-        displayPasses.forEach((pass, index) => {
+        displayPasses.forEach((pass) => {
           checkNewPage(8);
           
           pdf.setFontSize(10);

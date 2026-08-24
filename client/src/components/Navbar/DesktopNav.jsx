@@ -11,7 +11,7 @@ import { Box, Button } from '@mui/material';
  * @param {Object} props.colors - Color scheme
  * @returns {JSX.Element} The desktop navigation component
  */
-const DesktopNav = ({ navItems, isLoggedIn, navigate, colors }) => {
+const DesktopNav = ({ navItems, navigate, colors }) => {
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
       {navItems.map((item) => (

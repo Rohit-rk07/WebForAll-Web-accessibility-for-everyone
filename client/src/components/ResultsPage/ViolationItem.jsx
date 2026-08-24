@@ -34,7 +34,6 @@ import {
   HelpOutline
 } from '@mui/icons-material';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getNormalizedSeverity } from '../../utils/resultsUtils';
 import aiService from '../../services/aiService';
 

@@ -6,38 +6,16 @@ import { useNavigate } from 'react-router-dom';
 
 
 
-// API base URL from environment or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 /**
  * Home page component
  * Serves as the landing page with HTML upload/paste functionality
  * and displays accessibility analysis results
  */
 const Home = () => {
-  // State management
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const theme = useTheme();
   const navigate = useNavigate();
   const {demoLogin} = useAuth();
-
-  /**
-   * Handles analysis results from any source
-   * @param {Object} data - The analysis result data
-   */
-  const handleAnalysisResult = (data) => {
-    // Ensure the result has a consistent structure
-    const formattedResult = {
-      ...data,
-      results: data.results || {},
-      mode: data.mode || 'static_only'
-    };
-    
-    setResult(formattedResult);
-  };
 
   const handleDemoLogin = useCallback(async () => {
     if (demoLoading) return;
@@ -52,13 +30,6 @@ const Home = () => {
       setDemoLoading(false);
     }
   }, [demoLogin, navigate, demoLoading]);
-
-  /**
-   * Clears any error messages
-   */
-  const clearError = () => {
-    setError(null);
-  };
 
   return (
     <Box

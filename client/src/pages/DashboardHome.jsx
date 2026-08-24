@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Box, Paper, CircularProgress, Typography, Alert, AlertTitle, useTheme } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import UploadCard from '../components/UploadCard';
+const UploadCard = lazy(() => import('../components/UploadCard'));
 
 /**
  * Dashboard Home page component
@@ -66,14 +66,22 @@ const DashboardHome = () => {
         </Typography>
       </Box>
       
-      <UploadCard 
-        onAnalyze={handleAnalyze} 
-        defaultTab={0} 
-        isLoading={loading}
-        setIsLoading={setLoading}
-        onError={handleError}
-        clearError={clearError}
-      />
+      <Suspense
+        fallback={
+          <Paper elevation={1} sx={{ p: 4, mt: 3, borderRadius: 2, textAlign: 'center' }}>
+            <CircularProgress size={32} />
+          </Paper>
+        }
+      >
+        <UploadCard 
+          onAnalyze={handleAnalyze} 
+          defaultTab={0} 
+          isLoading={loading}
+          setIsLoading={setLoading}
+          onError={handleError}
+          clearError={clearError}
+        />
+      </Suspense>
       
       {/* Enhanced Loading State */}
       {loading && (

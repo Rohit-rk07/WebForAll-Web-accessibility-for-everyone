@@ -25,7 +25,7 @@ import {
   InfoOutlined
 } from '@mui/icons-material';
 import ViolationItem from './ViolationItem';
-import { extractAxeResults, getNormalizedSeverity, getSeverityConfig } from '../../utils/resultsUtils';
+import { extractAxeResults, getSeverityConfig } from '../../utils/resultsUtils';
 import aiService from '../../services/aiService';
 
 /**

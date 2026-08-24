@@ -15,7 +15,7 @@ import { useThemeMode } from '../../contexts/ThemeContext';
  * @param {Object} props.colors - Color scheme
  * @returns {JSX.Element} The user menu component
  */
-const UserMenu = ({ anchorEl, open, onClose, onLogout, navigate }) => {
+const UserMenu = ({ anchorEl, open, onClose, onLogout }) => {
   const { darkMode, toggleDarkMode } = useThemeMode();
   const theme = useTheme();
   const COLORS = {
