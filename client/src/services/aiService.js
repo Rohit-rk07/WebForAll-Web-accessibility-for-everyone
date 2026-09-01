@@ -77,7 +77,7 @@ export const sendChatMessage = async (messages, options = {}) => {
   try {
     const response = await axios.post(`${API_URL}/ai/chat`, {
       messages: messages,
-      model: options.model || 'gemini-1.5-flash',
+      model: options.model || 'gemini-2.5-flash',
       temperature: options.temperature || 0.7,
       max_tokens: options.max_tokens
     });

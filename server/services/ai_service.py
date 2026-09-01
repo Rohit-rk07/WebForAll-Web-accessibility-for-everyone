@@ -23,7 +23,8 @@ def initialize_gemini():
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         # Test the API key by creating a simple model instance
-        test_model = genai.GenerativeModel("gemini-1.5-flash")
+        # Using gemini-2.5-flash which is more widely available
+        test_model = genai.GenerativeModel("gemini-2.5-flash")
         GEMINI_CONFIGURED = True
         logger.info("Gemini AI configured successfully")
         return True
@@ -32,14 +33,14 @@ def initialize_gemini():
         GEMINI_CONFIGURED = False
         return False
 
-def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-1.5-flash", 
+def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-flash", 
                    temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
     """
     Generate chat completion using Gemini API.
     
     Args:
         messages: List of message dictionaries with 'role' and 'content'
-        model: Model name (defaults to gemini-1.5-flash)
+        model: Model name (defaults to gemini-2.5-flash)
         temperature: Response randomness (0.0 to 1.0)
         max_tokens: Maximum tokens in response
         
@@ -137,7 +138,7 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
             "Only output plain HTML in FIXED_CODE."
         )
         
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         response_text = response.text
         
