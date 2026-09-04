@@ -1,45 +1,80 @@
 // src/App.jsx
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
-import { useThemeMode } from './contexts/useThemeMode';
-import { useAuth } from './contexts/useAuth';
-import ErrorBoundary from './components/ErrorBoundary';
-const AiChatbot = lazy(() => import(/* webpackChunkName: "ai-chatbot" */ './components/AiChatbot'));
+import React, { Suspense, lazy } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
+import {
+  ThemeProvider as MuiThemeProvider,
+  createTheme,
+  CssBaseline,
+  Box,
+} from "@mui/material";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { useThemeMode } from "./contexts/useThemeMode";
+import { useAuth } from "./contexts/useAuth";
+import ErrorBoundary from "./components/ErrorBoundary";
+const AiChatbot = lazy(
+  () => import(/* webpackChunkName: "ai-chatbot" */ "./components/AiChatbot"),
+);
 
 // Lazy-loaded Pages with webpack chunk names for better debugging
-const Home = lazy(() => import(/* webpackChunkName: "home" */ './pages/Home'));
-const Login = lazy(() => import(/* webpackChunkName: "login" */ './pages/Login'));
-const Signup = lazy(() => import(/* webpackChunkName: "signup" */ './pages/Signup'));
-const DashboardHome = lazy(() => import(/* webpackChunkName: "dashboard-home" */ './pages/DashboardHome'));
-const History = lazy(() => import(/* webpackChunkName: "history" */ './pages/History'));
-const ResultsPage = lazy(() => import(/* webpackChunkName: "results" */ './pages/ResultsPage'));
-const ForgotPassword = lazy(() => import(/* webpackChunkName: "forgot-password" */ './pages/ForgotPassword'));
-const ResetPassword = lazy(() => import(/* webpackChunkName: "reset-password" */ './pages/ResetPassword'));
+const Home = lazy(() => import(/* webpackChunkName: "home" */ "./pages/Home"));
+const Login = lazy(
+  () => import(/* webpackChunkName: "login" */ "./pages/Login"),
+);
+const Signup = lazy(
+  () => import(/* webpackChunkName: "signup" */ "./pages/Signup"),
+);
+const DashboardHome = lazy(
+  () =>
+    import(/* webpackChunkName: "dashboard-home" */ "./pages/DashboardHome"),
+);
+const History = lazy(
+  () => import(/* webpackChunkName: "history" */ "./pages/History"),
+);
+const ResultsPage = lazy(
+  () => import(/* webpackChunkName: "results" */ "./pages/ResultsPage"),
+);
+const ForgotPassword = lazy(
+  () =>
+    import(/* webpackChunkName: "forgot-password" */ "./pages/ForgotPassword"),
+);
+const ResetPassword = lazy(
+  () =>
+    import(/* webpackChunkName: "reset-password" */ "./pages/ResetPassword"),
+);
 
 // Lazy-loaded Layouts
-const DashboardLayout = lazy(() => import(/* webpackChunkName: "dashboard-layout" */ './layouts/DashboardLayout'));
+const DashboardLayout = lazy(
+  () =>
+    import(
+      /* webpackChunkName: "dashboard-layout" */ "./layouts/DashboardLayout"
+    ),
+);
 
 /**
  * Protected Route Component
- * 
+ *
  * Redirects to login if not authenticated
  */
 const ProtectedRoute = () => {
   const { isLoggedIn, loading } = useAuth();
-  
+
   // Show nothing while checking authentication
   if (loading) {
     return null;
   }
-  
+
   // Redirect to login if not authenticated
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <Outlet />;
 };
 
@@ -51,22 +86,22 @@ function AppContent() {
   const { darkMode } = useThemeMode();
   const theme = createTheme({
     palette: {
-      mode: darkMode ? 'dark' : 'light',
+      mode: darkMode ? "dark" : "light",
       primary: {
-        main: '#4361ee',
-        light: '#738eef',
-        dark: '#2f4bc7',
-        contrastText: '#ffffff',
+        main: "#4361ee",
+        light: "#738eef",
+        dark: "#2f4bc7",
+        contrastText: "#ffffff",
       },
       secondary: {
-        main: '#3a0ca3',
-        light: '#5e3db8',
-        dark: '#2a0875',
-        contrastText: '#ffffff',
+        main: "#3a0ca3",
+        light: "#5e3db8",
+        dark: "#2a0875",
+        contrastText: "#ffffff",
       },
       background: {
-        default: darkMode ? '#181a1b' : '#f8f9fa',
-        paper: darkMode ? '#23272f' : '#ffffff',
+        default: darkMode ? "#181a1b" : "#f8f9fa",
+        paper: darkMode ? "#23272f" : "#ffffff",
       },
     },
     typography: {
@@ -77,31 +112,31 @@ function AppContent() {
       h4: { fontWeight: 600 },
       h5: { fontWeight: 500 },
       h6: { fontWeight: 500 },
-      button: { fontWeight: 500, textTransform: 'none' },
+      button: { fontWeight: 500, textTransform: "none" },
     },
     shape: { borderRadius: 8 },
     components: {
       MuiButton: {
         styleOverrides: {
           root: {
-            boxShadow: 'none',
-            '&:hover': { boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)' },
+            boxShadow: "none",
+            "&:hover": { boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" },
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
-          root: { boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)' },
+          root: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)" },
         },
       },
       MuiCssBaseline: {
         styleOverrides: {
           body: {
             background: darkMode
-              ? 'linear-gradient(135deg, #23272f 0%, #181a1b 100%)'
-              : 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-            minHeight: '100vh',
-            width: '100%',
+              ? "linear-gradient(135deg, #23272f 0%, #181a1b 100%)"
+              : "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
+            minHeight: "100vh",
+            width: "100%",
           },
         },
       },
@@ -112,30 +147,30 @@ function AppContent() {
       <CssBaseline />
       <ErrorBoundary>
         <AuthProvider>
-          <Box sx={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
+          <Box sx={{ width: "100vw", height: "100vh", overflow: "auto" }}>
             {/* Skip Navigation Link for Accessibility */}
             <Box
               component="a"
               href="#main-content"
               sx={{
-                position: 'absolute',
+                position: "absolute",
                 left: -9999,
                 top: 4,
                 zIndex: 9999,
                 padding: 2,
-                backgroundColor: 'primary.main',
-                color: 'white',
-                textDecoration: 'none',
+                backgroundColor: "primary.main",
+                color: "white",
+                textDecoration: "none",
                 borderRadius: 1,
-                '&:focus': {
+                "&:focus": {
                   left: 4,
-                  top: 4
-                }
+                  top: 4,
+                },
               }}
             >
               Skip to main content
             </Box>
-            
+
             <BrowserRouter>
               <Suspense fallback={<Box sx={{ p: 4 }} />}>
                 <Routes>
@@ -148,7 +183,10 @@ function AppContent() {
                   {/* Dashboard Routes (Protected) */}
                   <Route element={<ProtectedRoute />}>
                     <Route path="/dashboard" element={<DashboardLayout />}>
-                      <Route index element={<Navigate to="/dashboard/home" replace />} />
+                      <Route
+                        index
+                        element={<Navigate to="/dashboard/home" replace />}
+                      />
                       <Route path="home" element={<DashboardHome />} />
                       <Route path="results/:id" element={<ResultsPage />} />
                       <Route path="history" element={<History />} />

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { Box, useTheme } from '@mui/material';
-import { useAuth } from '../contexts/useAuth';
-import Navbar from '../components/Navbar';
+import React, { useEffect } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { Box, useTheme } from "@mui/material";
+import { useAuth } from "../contexts/useAuth";
+import Navbar from "../components/Navbar";
 
 /**
  * DashboardLayout component
@@ -19,7 +19,7 @@ const DashboardLayout = () => {
   // Check if user is logged in
   useEffect(() => {
     if (!isLoggedIn) {
-      navigate('/login');
+      navigate("/login");
     }
   }, [isLoggedIn, navigate]);
 
@@ -34,23 +34,23 @@ const DashboardLayout = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       {/* Navbar */}
       <Navbar />
-      
+
       {/* Main Content */}
-      <Box 
+      <Box
         id="main-content"
-        component="main" 
-        sx={{ 
+        component="main"
+        sx={{
           p: 3,
-          marginTop: '64px',
+          marginTop: "64px",
           background: COLORS.background,
-          minHeight: 'calc(100vh - 64px)',
-          overflow: 'auto',
+          minHeight: "calc(100vh - 64px)",
+          overflow: "auto",
         }}
         tabIndex={-1} // Allow focus but don't show outline
-      > 
+      >
         <Outlet />
       </Box>
     </Box>

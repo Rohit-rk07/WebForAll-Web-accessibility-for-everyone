@@ -34,6 +34,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from itsdangerous import URLSafeTimedSerializer
+from bs4 import BeautifulSoup
 import uvicorn
 
 # Import our modular components
@@ -524,7 +525,21 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         
         # Create data URL for dynamic analysis
         import base64
-        html_bytes = request.content.encode('utf-8')
+        html_document = request.content
+        if request.base_url:
+            soup = BeautifulSoup(html_document, "html.parser")
+            base_tag = soup.new_tag("base", href=str(request.base_url))
+            if soup.head:
+                soup.head.insert(0, base_tag)
+            else:
+                head = soup.new_tag("head")
+                head.insert(0, base_tag)
+                if soup.html:
+                    soup.html.insert(0, head)
+                else:
+                    soup.insert(0, head)
+            html_document = str(soup)
+        html_bytes = html_document.encode('utf-8')
         html_b64 = base64.b64encode(html_bytes).decode('utf-8')
         data_url = f"data:text/html;base64,{html_b64}"
         

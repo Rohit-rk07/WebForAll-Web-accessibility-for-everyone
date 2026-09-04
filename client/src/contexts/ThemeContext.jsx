@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { ThemeContext } from './ThemeContextDefinition';
-
+import React, { useState, useEffect } from "react";
+import { ThemeContext } from "./ThemeContextDefinition";
 
 export const ThemeProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(() => {
-    const stored = localStorage.getItem('darkMode');
+    const stored = localStorage.getItem("darkMode");
     return stored ? JSON.parse(stored) : false;
   });
 
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    
+    localStorage.setItem("darkMode", JSON.stringify(darkMode));
+
     // Apply or remove the dark-mode class to the document body
     if (darkMode) {
-      document.body.classList.add('dark-mode');
+      document.body.classList.add("dark-mode");
     } else {
-      document.body.classList.remove('dark-mode');
+      document.body.classList.remove("dark-mode");
     }
   }, [darkMode]);
 
@@ -26,4 +25,4 @@ export const ThemeProvider = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
-}; 
+};

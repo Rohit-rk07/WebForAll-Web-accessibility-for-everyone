@@ -1,7 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from main import validate_public_url
+from main import app, validate_public_url
+from fastapi.testclient import TestClient
 from models.analysis_models import ChatCompletionRequest, HTMLAnalysisRequest
 
 
@@ -27,3 +28,10 @@ def test_chat_request_rejects_system_role_and_out_of_range_temperature():
 def test_html_request_rejects_oversized_content():
     with pytest.raises(ValidationError):
         HTMLAnalysisRequest(content="x" * (5 * 1024 * 1024 + 1))
+
+
+def test_root_includes_security_headers():
+    response = TestClient(app).get("/")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "default-src 'self'" in response.headers["content-security-policy"]

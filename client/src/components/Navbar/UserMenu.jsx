@@ -1,11 +1,20 @@
-import React from 'react';
-import { Menu, MenuItem, Typography, ListItemIcon, Divider, Switch, Box, useTheme } from '@mui/material';
-import { DarkMode, LightMode, Logout } from '@mui/icons-material';
-import { useThemeMode } from '../../contexts/useThemeMode';
+import React from "react";
+import {
+  Menu,
+  MenuItem,
+  Typography,
+  ListItemIcon,
+  Divider,
+  Switch,
+  Box,
+  useTheme,
+} from "@mui/material";
+import { DarkMode, LightMode, Logout } from "@mui/icons-material";
+import { useThemeMode } from "../../contexts/useThemeMode";
 
 /**
  * UserMenu component for user dropdown menu
- * 
+ *
  * @param {Object} props - Component props
  * @param {HTMLElement} props.anchorEl - Anchor element
  * @param {boolean} props.open - Whether menu is open
@@ -23,7 +32,7 @@ const UserMenu = ({ anchorEl, open, onClose, onLogout }) => {
     border: theme.palette.divider,
     text: theme.palette.text.primary,
     primary: theme.palette.primary.main,
-    hover: theme.palette.action.hover
+    hover: theme.palette.action.hover,
   };
   return (
     <Menu
@@ -31,41 +40,53 @@ const UserMenu = ({ anchorEl, open, onClose, onLogout }) => {
       open={open}
       onClose={onClose}
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'right',
+        vertical: "bottom",
+        horizontal: "right",
       }}
       transformOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
+        vertical: "top",
+        horizontal: "right",
       }}
       PaperProps={{
         sx: {
           mt: 1.5,
-          boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
+          boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
           minWidth: 180,
-          bgcolor: COLORS.background
-        }
+          bgcolor: COLORS.background,
+        },
       }}
     >
-      <MenuItem disableRipple sx={{ cursor: 'default', '&:hover': { bgcolor: 'transparent' } }}>
+      <MenuItem
+        disableRipple
+        sx={{ cursor: "default", "&:hover": { bgcolor: "transparent" } }}
+      >
         <ListItemIcon sx={{ color: COLORS.primary }}>
-          {darkMode ? <DarkMode fontSize="small" /> : <LightMode fontSize="small" />}
+          {darkMode ? (
+            <DarkMode fontSize="small" />
+          ) : (
+            <LightMode fontSize="small" />
+          )}
         </ListItemIcon>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
           <Typography variant="body2" sx={{ flexGrow: 1 }}>
-            {darkMode ? 'Dark Mode' : 'Light Mode'}
+            {darkMode ? "Dark Mode" : "Light Mode"}
           </Typography>
-          <Switch checked={darkMode} onChange={toggleDarkMode} color="primary" size="small" />
+          <Switch
+            checked={darkMode}
+            onChange={toggleDarkMode}
+            color="primary"
+            size="small"
+          />
         </Box>
       </MenuItem>
       <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
-      <MenuItem 
+      <MenuItem
         onClick={onLogout}
-        sx={{ 
+        sx={{
           color: COLORS.text,
-          '&:hover': {
-            bgcolor: COLORS.hover
-          }
+          "&:hover": {
+            bgcolor: COLORS.hover,
+          },
         }}
       >
         <ListItemIcon sx={{ color: COLORS.primary }}>
@@ -77,4 +98,4 @@ const UserMenu = ({ anchorEl, open, onClose, onLogout }) => {
   );
 };
 
-export default UserMenu; 
+export default UserMenu;

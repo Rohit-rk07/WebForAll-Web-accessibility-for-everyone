@@ -152,7 +152,6 @@ async def run_analysis(data: Dict[str, Any]):
             logger.info("Creating browser context...")
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 720},
-                bypass_csp=True,
             )
             page = await context.new_page()
 

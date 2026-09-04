@@ -1,27 +1,23 @@
-import React, { useState } from 'react';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  Box, 
-  Avatar, 
+import React, { useState } from "react";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Box,
+  Avatar,
   IconButton,
   Drawer,
   useMediaQuery,
-  useTheme
-} from '@mui/material';
-import { 
-  Menu as MenuIcon, 
-  Security,
-  AccountCircle
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/useAuth';
+  useTheme,
+} from "@mui/material";
+import { Menu as MenuIcon, Security, AccountCircle } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/useAuth";
 
 // Import components
-import NavDrawer from './NavDrawer';
-import DesktopNav from './DesktopNav';
-import UserMenu from './UserMenu';
+import NavDrawer from "./NavDrawer";
+import DesktopNav from "./DesktopNav";
+import UserMenu from "./UserMenu";
 
 /**
  * Navbar component
@@ -31,11 +27,11 @@ const Navbar = () => {
   // State management
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
-  
+
   // Hooks
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { isLoggedIn, logout } = useAuth();
 
   const handleDrawerToggle = () => {
@@ -53,14 +49,14 @@ const Navbar = () => {
   const handleLogout = () => {
     handleUserMenuClose();
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   // Navigation items - different based on login status
-  const navItems = isLoggedIn 
+  const navItems = isLoggedIn
     ? [
-        { text: 'Dashboard', icon: 'DashboardIcon', path: '/dashboard/home' },
-        { text: 'History', icon: 'HistoryIcon', path: '/dashboard/history' },
+        { text: "Dashboard", icon: "DashboardIcon", path: "/dashboard/home" },
+        { text: "History", icon: "HistoryIcon", path: "/dashboard/history" },
       ]
     : [];
 
@@ -72,62 +68,69 @@ const Navbar = () => {
     lightText: theme.palette.text.secondary,
     primary: theme.palette.primary.main,
     secondary: theme.palette.secondary.main,
-    hover: theme.palette.action.hover
+    hover: theme.palette.action.hover,
   };
 
   return (
     <>
-      <AppBar 
-        position="fixed" 
-        elevation={0} 
-        sx={{ 
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
           bgcolor: COLORS.background,
           color: COLORS.text,
-          zIndex: theme.zIndex.drawer + 2
+          zIndex: theme.zIndex.drawer + 2,
         }}
       >
         <Toolbar>
           {/* Logo and Brand - different destination based on login status */}
-          <Box 
-            onClick={() => navigate(isLoggedIn ? '/dashboard/home' : '/')}
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+          <Box
+            onClick={() => navigate(isLoggedIn ? "/dashboard/home" : "/")}
+            sx={{
+              display: "flex",
+              alignItems: "center",
               gap: 1.5,
-              textDecoration: 'none',
+              textDecoration: "none",
               color: COLORS.text,
-              cursor: 'pointer',
-              '&:hover': {
-                opacity: 0.9
-              }
+              cursor: "pointer",
+              "&:hover": {
+                opacity: 0.9,
+              },
             }}
           >
-            <Avatar sx={{ 
-              background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%)`,
-              width: 40, 
-              height: 40 
-            }}>
+            <Avatar
+              sx={{
+                background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%)`,
+                width: 40,
+                height: 40,
+              }}
+            >
               <Security />
             </Avatar>
-            <Typography variant="h6" component="span" fontWeight="bold" color={COLORS.text}>
+            <Typography
+              variant="h6"
+              component="span"
+              fontWeight="bold"
+              color={COLORS.text}
+            >
               Accessibility Analyzer
             </Typography>
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
-          
+
           {/* Navigation Links - Desktop */}
           {!isMobile && (
-            <DesktopNav 
-              navItems={navItems} 
-              isLoggedIn={isLoggedIn} 
-              navigate={navigate} 
-              colors={COLORS} 
+            <DesktopNav
+              navItems={navItems}
+              isLoggedIn={isLoggedIn}
+              navigate={navigate}
+              colors={COLORS}
             />
           )}
-          
+
           {/* Authentication Buttons */}
-          <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
+          <Box sx={{ display: "flex", gap: 1, ml: 2 }}>
             {!isLoggedIn ? (
               <DesktopNav.LoginButton navigate={navigate} colors={COLORS} />
             ) : (
@@ -138,13 +141,13 @@ const Navbar = () => {
                 <AccountCircle />
               </IconButton>
             )}
-          
+
             {/* Mobile Menu Button */}
             {isMobile && (
-              <IconButton 
-                color="inherit" 
+              <IconButton
+                color="inherit"
                 aria-label="open drawer"
-                edge="end" 
+                edge="end"
                 onClick={handleDrawerToggle}
                 sx={{ ml: 1 }}
               >
@@ -156,7 +159,7 @@ const Navbar = () => {
       </AppBar>
 
       {/* User Menu */}
-      <UserMenu 
+      <UserMenu
         anchorEl={userMenuAnchor}
         open={Boolean(userMenuAnchor)}
         onClose={handleUserMenuClose}
@@ -164,7 +167,7 @@ const Navbar = () => {
         navigate={navigate}
         colors={COLORS}
       />
-      
+
       {/* Mobile Drawer */}
       <Drawer
         variant="temporary"
@@ -173,15 +176,15 @@ const Navbar = () => {
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
         sx={{
-          display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            boxSizing: "border-box",
             width: 280,
-            bgcolor: COLORS.background
+            bgcolor: COLORS.background,
           },
         }}
       >
-        <NavDrawer 
+        <NavDrawer
           navItems={navItems}
           isLoggedIn={isLoggedIn}
           navigate={navigate}
@@ -194,4 +197,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

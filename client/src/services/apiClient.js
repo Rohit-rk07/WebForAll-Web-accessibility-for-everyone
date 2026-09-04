@@ -3,6 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const getToken = () => localStorage.getItem('accessToken');
 
 const buildUrl = (path) => `${API_BASE_URL}${path}`;
+const REQUEST_TIMEOUT_MS = 30000;
 
 const authHeaders = async (extraHeaders = {}) => {
   const token = getToken();
@@ -55,15 +56,23 @@ export const apiJson = async (path, options = {}) => {
   const csrfHeader = isStateChanging ? await csrfHeaders() : {};
   const authHeaderValue = await authHeaders();
 
-  const response = await fetch(buildUrl(path), {
-    ...options,
-    headers: {
-      ...csrfHeader,
-      ...authHeaderValue,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {})
-    }
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(buildUrl(path), {
+      ...options,
+      signal: options.signal || controller.signal,
+      headers: {
+        ...csrfHeader,
+        ...authHeaderValue,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {})
+      }
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let data = null;
   try {
@@ -74,7 +83,9 @@ export const apiJson = async (path, options = {}) => {
 
   if (!response.ok) {
     const message = data?.detail || data?.message || `Request failed (${response.status})`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;
@@ -84,16 +95,24 @@ export const apiForm = async (path, formData, options = {}) => {
   const csrfHeader = await csrfHeaders();
   const authHeaderValue = await authHeaders();
 
-  const response = await fetch(buildUrl(path), {
-    ...options,
-    method: options.method || 'POST',
-    headers: {
-      ...csrfHeader,
-      ...authHeaderValue,
-      ...(options.headers || {})
-    },
-    body: formData
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(buildUrl(path), {
+      ...options,
+      signal: options.signal || controller.signal,
+      method: options.method || 'POST',
+      headers: {
+        ...csrfHeader,
+        ...authHeaderValue,
+        ...(options.headers || {})
+      },
+      body: formData
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let data = null;
   try {
@@ -104,7 +123,9 @@ export const apiForm = async (path, formData, options = {}) => {
 
   if (!response.ok) {
     const message = data?.detail || data?.message || `Request failed (${response.status})`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;
