@@ -18,7 +18,7 @@ let csrfToken = null;
 
 const getCsrfToken = async () => {
   if (csrfToken) return csrfToken;
-  
+
   try {
     const response = await fetch(buildUrl('/csrf-token'));
     const data = await response.json();
