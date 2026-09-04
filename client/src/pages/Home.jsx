@@ -1,18 +1,15 @@
 import React, { useState, useCallback } from "react";
 import Navbar from "../components/Navbar";
-import { Box, Container, useTheme } from "@mui/material";
+import { Alert, Box, Container, useTheme } from "@mui/material";
 import { useAuth } from "../contexts/useAuth";
 import { useNavigate } from "react-router-dom";
 import HeroSection from "../components/Home/HeroSection";
 import FeatureCard from "../components/Home/FeatureCard";
-import DemoButton from "../components/Home/DemoButton";
+import { getUserFacingError } from "../utils/userFacingError";
 
-/**
- * Home page component
- * Serves as the landing page with feature cards and demo login
- */
 const Home = () => {
   const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState("");
   const theme = useTheme();
   const navigate = useNavigate();
   const { demoLogin } = useAuth();
@@ -20,11 +17,17 @@ const Home = () => {
   const handleDemoLogin = useCallback(async () => {
     if (demoLoading) return;
     setDemoLoading(true);
+    setDemoError("");
     try {
       await demoLogin();
       navigate("/dashboard/home");
     } catch (e) {
-      console.error("Demo login failed", e);
+      setDemoError(
+        getUserFacingError(
+          e,
+          "Demo login failed. Sign in with your account or try again.",
+        ),
+      );
     } finally {
       setDemoLoading(false);
     }
@@ -35,25 +38,25 @@ const Home = () => {
       icon: "🔍",
       title: "Comprehensive Analysis",
       description:
-        "• Dynamic analysis using axe-core (100+ rules)\n• WCAG 2.0, 2.1, 2.2 compliance checking\n• Multiple input methods (URL, HTML file, paste)\n• Real-time JavaScript-rendered content analysis",
+        "• Dynamic analysis using axe-core (100+ rules)\n• WCAG 2.0, 2.1, 2.2 compliance checking\n• URL, HTML file, or pasted code",
     },
     {
       icon: "🤖",
       title: "AI-Powered Insights",
       description:
-        "• Google Gemini AI explanations\n• Step-by-step fix instructions\n• Code examples and best practices\n• Interactive chatbot assistance",
+        "• Plain-language explanations\n• Step-by-step fix instructions\n• Interactive chatbot assistance",
     },
     {
       icon: "📊",
       title: "Detailed Reporting",
       description:
-        "• Accessibility scores and breakdowns\n• Severity-based issue categorization\n• PDF export with professional formatting\n• Executive summaries and recommendations",
+        "• Scores grouped by severity\n• PDF export for sharing\n• History of previous scans",
     },
     {
       icon: "💾",
       title: "History & Tracking",
       description:
-        "• Save and organize analysis results\n• Track improvements over time\n• Compare different versions\n• Quick access to previous reports",
+        "• Save analysis results\n• Search, sort, and reopen reports\n• Delete scans you no longer need",
     },
   ];
 
@@ -68,35 +71,43 @@ const Home = () => {
       }}
     >
       <Navbar />
-
-      <HeroSection theme={theme} />
-
-      <Container maxWidth="xl" sx={{ py: 0 }}>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: 2,
-            mb: 4,
-          }}
-        >
-          {features.map((feature, index) => (
-            <FeatureCard
-              key={index}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-              theme={theme}
-            />
-          ))}
-        </Box>
-
-        <DemoButton
-          loading={demoLoading}
-          onClick={handleDemoLogin}
+      <Box
+        id="main-content"
+        component="main"
+        sx={{ pt: "64px", flexGrow: 1 }}
+        tabIndex={-1}
+      >
+        <HeroSection
           theme={theme}
+          onDemoClick={handleDemoLogin}
+          demoLoading={demoLoading}
         />
-      </Container>
+
+        <Container maxWidth="lg" sx={{ pb: 6 }}>
+          {demoError && (
+            <Alert severity="error" sx={{ mb: 3, wordBreak: "break-word" }}>
+              {demoError}
+            </Alert>
+          )}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 2,
+            }}
+          >
+            {features.map((feature) => (
+              <FeatureCard
+                key={feature.title}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                theme={theme}
+              />
+            ))}
+          </Box>
+        </Container>
+      </Box>
     </Box>
   );
 };

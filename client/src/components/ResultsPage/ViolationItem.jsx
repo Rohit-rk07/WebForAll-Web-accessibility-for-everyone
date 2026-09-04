@@ -51,6 +51,7 @@ const ViolationItem = ({
   const [loadingAiSuggestion, setLoadingAiSuggestion] = useState(false);
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   const severity = getNormalizedSeverity(issue);
   const severityConfig = severityMap[severity] || severityMap.minor;
@@ -81,12 +82,13 @@ const ViolationItem = ({
     try {
       const response = await aiService.getIssueExplanation(issue);
       setAiSuggestion(response);
+      setAiError("");
     } catch (error) {
-      console.error('Error getting AI suggestion:', error);
-      setAiSuggestion({
-        fixedCode: 'Unable to generate fixed code at this time.',
-        explanation: 'Unable to get AI suggestion. Please try again later.'
-      });
+      setAiSuggestion(null);
+      setAiError(
+        error.message ||
+          "Unable to get an AI explanation. Check your connection and try again.",
+      );
     } finally {
       setLoadingAiSuggestion(false);
     }
@@ -185,7 +187,7 @@ ${aiSuggestion.fixedCode}
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-          <Typography variant="subtitle1" fontWeight="medium" color="text.primary">
+          <Typography variant="subtitle1" fontWeight="medium" color="text.primary" sx={{ wordBreak: 'break-word' }}>
             {issue.id || issue.rule || 'Unknown Rule'}
           </Typography>
           <Chip 
@@ -199,8 +201,10 @@ ${aiSuggestion.fixedCode}
               startIcon={<SmartToy />}
               variant="outlined"
               size="small"
-              color={showAiSuggestion ? "primary" : "primary"}
+              color="primary"
               onClick={handleAiFixClick}
+              disabled={loadingAiSuggestion}
+              aria-label={showAiSuggestion ? 'Hide AI Fix' : `Get AI Fix for ${issue.id || 'issue'}`}
               sx={{ 
                 ml: 'auto', 
                 minWidth: 120
@@ -247,22 +251,34 @@ ${aiSuggestion.fixedCode}
               ? theme.palette.primary.dark + '20'
               : theme.palette.primary.light + '10',
             borderRadius: 2,
-            border: `1px solid ${theme.palette.primary.main}40`
+            border: `2px solid ${theme.palette.primary.main}`,
+            wordBreak: 'break-word',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <SmartToy sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-                🤖 AI Fix
+                AI Fix explanation
               </Typography>
             </Box>
 
             {loadingAiSuggestion ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }} role="status">
                 <CircularProgress size={20} />
                 <Typography variant="body2" color="text.secondary">
                   Getting AI fix...
                 </Typography>
               </Box>
+            ) : aiError ? (
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={handleAiFixClick}>
+                    Retry
+                  </Button>
+                }
+              >
+                {aiError}
+              </Alert>
             ) : aiSuggestion ? (
               <Box>
                 {/* Explanation */}

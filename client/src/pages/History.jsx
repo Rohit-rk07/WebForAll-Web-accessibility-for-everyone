@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 import {
   Typography,
@@ -21,10 +21,10 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
+  TablePagination,
 } from "@mui/material";
 import {
   Delete,
-  Edit,
   Visibility,
   Search,
   SortByAlpha,
@@ -34,6 +34,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { apiDelete, apiJson } from "../services/apiClient";
+import { getUserFacingError } from "../utils/userFacingError";
+
+const PAGE_SIZE = 10;
 
 const History = () => {
   const navigate = useNavigate();
@@ -43,54 +46,57 @@ const History = () => {
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [page, setPage] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const theme = useTheme();
 
-  // Load reports from backend on mount
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const data = await apiJson("/history?limit=100");
-        const items = Array.isArray(data.items) ? data.items : [];
-        const mapped = items.map((it, idx) => ({
-          id: it.id || String(idx),
-          url: it.input_ref || "",
-          name:
-            it.input_type === "url"
-              ? (() => {
-                  try {
-                    return new URL(it.input_ref || "").hostname;
-                  } catch {
-                    return it.input_ref || "Unknown URL";
-                  }
-                })()
-              : it.input_type || "analysis",
-          date: it.created_at || null,
-          violations_count:
-            typeof it.violations_count === "number" ? it.violations_count : 0,
-        }));
-        setReports(mapped);
-      } catch (e) {
-        console.error(e);
-        setLoadError(e.message || "Unable to load analysis history.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHistory();
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await apiJson("/history?limit=100");
+      const items = Array.isArray(data.items) ? data.items : [];
+      const mapped = items.map((it, idx) => ({
+        id: it.id || String(idx),
+        url: it.input_ref || "",
+        name:
+          it.input_type === "url"
+            ? (() => {
+                try {
+                  return new URL(it.input_ref || "").hostname;
+                } catch {
+                  return it.input_ref || "Unknown URL";
+                }
+              })()
+            : it.input_type || "analysis",
+        date: it.created_at || null,
+        violations_count:
+          typeof it.violations_count === "number" ? it.violations_count : 0,
+      }));
+      setReports(mapped);
+    } catch (e) {
+      setLoadError(
+        getUserFacingError(e, "Unable to load analysis history."),
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Filter reports based on search term
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
   const filteredReports = reports.filter(
     (report) =>
       (report.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (report.url || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Sort reports based on sort field and direction
   const sortedReports = [...filteredReports].sort((a, b) => {
     let comparison = 0;
 
@@ -105,7 +111,11 @@ const History = () => {
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  // Handle sort toggle
+  const pagedReports = sortedReports.slice(
+    page * PAGE_SIZE,
+    page * PAGE_SIZE + PAGE_SIZE,
+  );
+
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -113,102 +123,91 @@ const History = () => {
       setSortField(field);
       setSortDirection("desc");
     }
+    setPage(0);
   };
 
-  // Handle view report (navigate to deep-linked results)
   const handleViewReport = (report) => {
     if (!report?.id) return;
     navigate(`/dashboard/results/${report.id}`);
   };
 
-  // Handle edit report name
-  const handleEditClick = (report) => {
-    setCurrentReport({ ...report });
-    setEditDialogOpen(true);
-  };
-
-  // Save edited report name
-  const handleSaveEdit = () => {
-    if (currentReport) {
-      setReports(
-        reports.map((report) =>
-          report.id === currentReport.id ? currentReport : report,
-        ),
-      );
-      setEditDialogOpen(false);
-    }
-  };
-
-  // Handle delete report
   const handleDeleteClick = (report) => {
     setCurrentReport(report);
+    setActionError("");
     setDeleteDialogOpen(true);
   };
 
-  // Confirm delete report (calls backend)
   const handleConfirmDelete = async () => {
-    if (!currentReport) return;
+    if (!currentReport || deleting) return;
+    setDeleting(true);
+    setActionError("");
     try {
       await apiDelete(`/history/${currentReport.id}`);
-      const updated = reports.filter((r) => r.id !== currentReport.id);
-      setReports(updated);
+      setReports((prev) => prev.filter((r) => r.id !== currentReport.id));
       setDeleteDialogOpen(false);
     } catch (e) {
-      console.error(e);
+      setActionError(
+        getUserFacingError(e, "Could not delete this report. Try again."),
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
-      {/* Header Section */}
+    <Box sx={{ p: { xs: 1, md: 3 }, maxWidth: 1200, mx: "auto" }}>
       <Paper
-        elevation={1}
+        elevation={0}
         sx={{
           p: 3,
           mb: 3,
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
+          bgcolor: "background.paper",
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
+        <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
           Analysis History
         </Typography>
-        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-          Track your accessibility testing progress and revisit previous reports
+        <Typography variant="body1" color="text.secondary">
+          Search, sort, open, or delete previous scans.
         </Typography>
       </Paper>
 
-      {/* Search and Filter Section */}
       <Box
         sx={{
-          mb: 4,
+          mb: 3,
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
           gap: 2,
         }}
       >
         <TextField
-          placeholder="Search websites..."
+          label="Search history"
+          placeholder="Search by website or URL"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setPage(0);
+          }}
           variant="outlined"
           size="small"
           sx={{ flexGrow: 1 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search />
+                <Search aria-hidden="true" />
               </InputAdornment>
             ),
           }}
         />
 
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <Button
             variant={sortField === "name" ? "contained" : "outlined"}
             startIcon={<SortByAlpha />}
             onClick={() => handleSort("name")}
             size="small"
+            aria-pressed={sortField === "name"}
           >
             Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
@@ -218,6 +217,7 @@ const History = () => {
             startIcon={<CalendarMonth />}
             onClick={() => handleSort("date")}
             size="small"
+            aria-pressed={sortField === "date"}
           >
             Date {sortField === "date" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
@@ -227,6 +227,7 @@ const History = () => {
             startIcon={<FilterList />}
             onClick={() => handleSort("violations")}
             size="small"
+            aria-pressed={sortField === "violations"}
           >
             Violations{" "}
             {sortField === "violations" &&
@@ -236,26 +237,33 @@ const History = () => {
       </Box>
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <Box
+          sx={{ display: "flex", justifyContent: "center", py: 8 }}
+          role="status"
+        >
           <CircularProgress />
+          <Typography sx={{ ml: 2 }}>Loading history...</Typography>
         </Box>
       ) : loadError ? (
-        <Alert severity="error">{loadError}</Alert>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={fetchHistory}>
+              Retry
+            </Button>
+          }
+          sx={{ wordBreak: "break-word" }}
+        >
+          {loadError}
+        </Alert>
       ) : (
         <TableContainer
           component={Paper}
-          sx={{ borderRadius: 2, boxShadow: 2 }}
+          sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}` }}
         >
           <Table>
             <TableHead>
-              <TableRow
-                sx={{
-                  bgcolor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.05)"
-                      : "primary.50",
-                }}
-              >
+              <TableRow>
                 <TableCell>
                   <Typography fontWeight="bold">Website</Typography>
                 </TableCell>
@@ -274,124 +282,108 @@ const History = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {sortedReports.length > 0 ? (
-                sortedReports.map((report) => {
-                  return (
-                    <TableRow key={report.id} hover>
-                      <TableCell>
-                        <Typography fontWeight="medium">
-                          {report.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{report.url}</TableCell>
-                      <TableCell>
-                        {report.date
-                          ? new Date(report.date).toLocaleString()
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={`${report.violations_count ?? 0}`}
-                          color={
-                            (report.violations_count ?? 0) === 0
-                              ? "success"
-                              : report.violations_count < 10
-                                ? "warning"
-                                : "error"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Box
-                          sx={{ display: "flex", justifyContent: "flex-end" }}
-                        >
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleViewReport(report)}
-                          >
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleEditClick(report)}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteClick(report)}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+              {pagedReports.length > 0 ? (
+                pagedReports.map((report) => (
+                  <TableRow key={report.id} hover>
+                    <TableCell>
+                      <Typography fontWeight="medium">{report.name}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 280, wordBreak: "break-all" }}>
+                      {report.url}
+                    </TableCell>
+                    <TableCell>
+                      {report.date
+                        ? new Date(report.date).toLocaleString()
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${report.violations_count ?? 0}`}
+                        color={
+                          (report.violations_count ?? 0) === 0
+                            ? "success"
+                            : report.violations_count < 10
+                              ? "warning"
+                              : "error"
+                        }
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => handleViewReport(report)}
+                        aria-label={`View report for ${report.name}`}
+                      >
+                        <Visibility fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteClick(report)}
+                        aria-label={`Delete report for ${report.name}`}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     <Typography variant="body1" color="text.secondary">
                       {searchTerm
-                        ? "No matching reports found"
-                        : "No reports available"}
+                        ? "No matching reports found. Clear search to see all scans."
+                        : "No reports yet. Run a scan from the dashboard to create one."}
                     </Typography>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={sortedReports.length}
+            page={page}
+            onPageChange={(_, nextPage) => setPage(nextPage)}
+            rowsPerPage={PAGE_SIZE}
+            rowsPerPageOptions={[PAGE_SIZE]}
+          />
         </TableContainer>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-        <DialogTitle>Edit Website Name</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Website Name"
-            fullWidth
-            variant="outlined"
-            value={currentReport?.name || ""}
-            onChange={(e) =>
-              setCurrentReport({ ...currentReport, name: e.target.value })
-            }
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveEdit} variant="contained">
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={() => !deleting && setDeleteDialogOpen(false)}
+        aria-labelledby="delete-report-title"
       >
-        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogTitle id="delete-report-title">Delete this report?</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete the report for "
-            {currentReport?.name}"? This action cannot be undone.
+          <Typography sx={{ wordBreak: "break-word" }}>
+            This will permanently delete the report for "{currentReport?.name}".
+            This cannot be undone.
           </Typography>
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {actionError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deleting}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleConfirmDelete}
             variant="contained"
             color="error"
+            disabled={deleting}
           >
-            Delete
+            {deleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

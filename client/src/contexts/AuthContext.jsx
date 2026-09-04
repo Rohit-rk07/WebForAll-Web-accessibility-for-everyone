@@ -27,11 +27,14 @@ const AuthProviderInner = ({ children }) => {
         if (userData) {
           setUser(userData);
         } else {
-          // Token is invalid or expired
           localStorage.removeItem("accessToken");
         }
       } catch (err) {
-        console.error("Auth check failed:", err);
+        localStorage.removeItem("accessToken");
+        setUser(null);
+        if (err.status !== 401) {
+          console.error("Auth check failed:", err);
+        }
       } finally {
         setLoading(false);
       }
@@ -70,20 +73,11 @@ const AuthProviderInner = ({ children }) => {
 
       return userData;
     } catch (err) {
-      // Provide more specific error messages based on error type
-      let errorMessage = "An unexpected error occurred during login";
+      const status = err.status || err.response?.status;
+      let errorMessage = "Unable to sign in. Check your email and password.";
 
-      if (err.response) {
-        const status = err.response.status;
-        if (status === 401) {
-          errorMessage = "Invalid email or password";
-        } else if (status === 429) {
-          errorMessage = "Too many login attempts. Please try again later.";
-        } else if (status === 500) {
-          errorMessage = "Server error. Please try again later.";
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
+      if (status === 401) {
+        errorMessage = "Invalid email or password";
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -116,24 +110,11 @@ const AuthProviderInner = ({ children }) => {
 
       return responseData;
     } catch (err) {
-      // Provide more specific error messages for registration
-      let errorMessage = "An unexpected error occurred during registration";
+      const status = err.status || err.response?.status;
+      let errorMessage = "Unable to create an account. Please try again.";
 
-      if (err.response) {
-        const status = err.response.status;
-        if (status === 400) {
-          errorMessage =
-            err.response.data?.detail || "Invalid registration data";
-        } else if (status === 409) {
-          errorMessage = "Email already registered";
-        } else if (status === 429) {
-          errorMessage =
-            "Too many registration attempts. Please try again later.";
-        } else if (status === 500) {
-          errorMessage = "Server error. Please try again later.";
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
+      if (status === 409) {
+        errorMessage = "Email already registered";
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -152,21 +133,8 @@ const AuthProviderInner = ({ children }) => {
         body: JSON.stringify({ email }),
       });
     } catch (err) {
-      let errorMessage = "An unexpected error occurred";
-
-      if (err.response) {
-        const status = err.response.status;
-        if (status === 429) {
-          errorMessage = "Too many requests. Please try again later.";
-        } else if (status === 500) {
-          errorMessage = "Server error. Please try again later.";
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
+      const errorMessage =
+        err.message || "Unable to send a reset email. Please try again.";
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -184,23 +152,12 @@ const AuthProviderInner = ({ children }) => {
         }),
       });
     } catch (err) {
-      let errorMessage = "An unexpected error occurred";
-
-      if (err.response) {
-        const status = err.response.status;
-        if (status === 400) {
-          errorMessage = "Invalid or expired reset token";
-        } else if (status === 429) {
-          errorMessage = "Too many attempts. Please try again later.";
-        } else if (status === 500) {
-          errorMessage = "Server error. Please try again later.";
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
+      const status = err.status || err.response?.status;
+      let errorMessage =
+        err.message || "Unable to reset your password. Please try again.";
+      if (status === 400) {
+        errorMessage = "Invalid or expired reset token";
       }
-
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -238,20 +195,8 @@ const AuthProviderInner = ({ children }) => {
       setUser(userData);
       return userData;
     } catch (err) {
-      let errorMessage = "Demo login failed. Please try again later.";
-
-      if (err.response) {
-        const status = err.response.status;
-        if (status === 500) {
-          errorMessage =
-            "Demo service temporarily unavailable. Please try again later.";
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
+      const errorMessage =
+        err.message || "Demo login failed. Please try again later.";
       setError(errorMessage);
       throw new Error(errorMessage);
     }

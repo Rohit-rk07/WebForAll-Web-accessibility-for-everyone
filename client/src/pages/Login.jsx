@@ -133,7 +133,7 @@ const Login = () => {
 
           {/* Error Alert */}
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3, wordBreak: "break-word" }}>
               {error}
             </Alert>
           )}
@@ -217,10 +217,10 @@ const Login = () => {
               size="large"
               fullWidth
               disabled={isSubmitting}
+              aria-label={isSubmitting ? "Signing in" : "Sign in"}
               sx={{
                 py: 1.5,
                 borderRadius: 2,
-                boxShadow: "0 4px 14px rgba(85, 98, 255, 0.4)",
                 mt: 2,
               }}
             >
@@ -246,6 +246,7 @@ const Login = () => {
               size="large"
               fullWidth
               disabled={isSubmitting}
+              aria-label="Continue as demo user"
               sx={{
                 py: 1.5,
                 borderRadius: 2,

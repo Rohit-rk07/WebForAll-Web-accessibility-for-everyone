@@ -15,12 +15,6 @@ import {
   Button,
   CircularProgress,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Fab,
-  Tooltip,
   Alert,
 } from "@mui/material";
 import { ArrowBack, Download } from "@mui/icons-material";
@@ -76,7 +70,6 @@ const ResultsPage = () => {
         setAnalyzedUrl(analyzedUrlValue || "");
         setLoading(false);
       } catch (e) {
-        console.error(e);
         setLoadError(e.message || "Unable to load this analysis.");
         setLoading(false);
       }
@@ -155,7 +148,9 @@ const ResultsPage = () => {
           gap: 2,
         }}
       >
-        <Alert severity="error">{loadError || "No results found"}</Alert>
+        <Alert severity="error" sx={{ wordBreak: "break-word" }}>
+          {loadError || "No results found"}
+        </Alert>
         <Button variant="contained" onClick={handleBackClick}>
           Back to Dashboard
         </Button>
@@ -167,20 +162,27 @@ const ResultsPage = () => {
     <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>
       {/* Header */}
       <Paper
-        elevation={1}
+        elevation={0}
         sx={{
           p: 2,
           mb: 3,
           display: "flex",
-          alignItems: "center",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "flex-start", sm: "center" },
           justifyContent: "space-between",
+          gap: 2,
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <IconButton onClick={handleBackClick} color="primary">
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, minWidth: 0 }}>
+          <IconButton
+            onClick={handleBackClick}
+            color="primary"
+            aria-label="Back to dashboard"
+          >
             <ArrowBack />
           </IconButton>
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography variant="h4" component="h1" sx={{ fontWeight: "bold" }}>
               Accessibility Analysis Results
             </Typography>
@@ -188,14 +190,13 @@ const ResultsPage = () => {
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ mt: 0.5 }}
+                sx={{ mt: 0.5, wordBreak: "break-all" }}
               >
                 <strong>Analyzed URL:</strong>{" "}
                 <a
                   href={analyzedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ wordBreak: "break-all" }}
                 >
                   {analyzedUrl}
                 </a>
@@ -203,15 +204,13 @@ const ResultsPage = () => {
             )}
           </Box>
         </Box>
-        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Download />}
-            onClick={handleExportClick}
-          >
-            Export Results
-          </Button>
-        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<Download />}
+          onClick={handleExportClick}
+        >
+          Export Results
+        </Button>
       </Paper>
 
       {/* Main Content */}

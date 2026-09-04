@@ -1,47 +1,71 @@
-import React from 'react';
-import { Box, Typography } from '@mui/material';
+import React from "react";
+import { Box, Button, Stack, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
-/**
- * HeroSection Component
- * Displays the main hero section with tagline
- * 
- * @param {Object} props - Component props
- * @param {Object} props.theme - MUI theme object
- * @returns {JSX.Element} The hero section component
- */
-const HeroSection = ({ theme }) => {
+const HeroSection = ({ theme, onDemoClick, demoLoading }) => {
+  const navigate = useNavigate();
+
   return (
-    <Box sx={{ 
-      display: 'flex',
-      justifyContent: 'center',
-      width: '100%',
-      py: 8
-    }}>
-      <Box sx={{ 
-        width: '100%', 
-        textAlign: 'center',
-        py: 3,
-        px: 4,
-        bgcolor: 'rgba(0,0,0,0.0)',
-        borderRadius: 3,
-        border: '1px solid rgba(0,0,0,0)'
-      }}>
-        <Typography 
-          variant="h3" 
-          sx={{ 
-            color: theme.palette.text.secondary,
-            fontWeight: 500,
-            fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            fontSize: { xs: '1.6rem', md: '2.0rem' },
-            lineHeight: 1,
-            maxWidth: '1000px',
-            mx: 'auto'
+    <Box
+      component="section"
+      sx={{
+        display: "flex",
+        justifyContent: "center",
+        width: "100%",
+        py: { xs: 5, md: 8 },
+        px: 2,
+      }}
+    >
+      <Box sx={{ width: "100%", maxWidth: 800, textAlign: "center" }}>
+        <Typography
+          variant="h1"
+          sx={{
+            color: theme.palette.text.primary,
+            fontWeight: 700,
+            fontSize: { xs: "2rem", md: "2.75rem" },
+            lineHeight: 1.2,
+            mb: 2,
           }}
         >
-          Analyze website accessibility with AI-powered insights{' '}
-          <br />
-          and recommendations for free
+          Find and fix website accessibility issues
         </Typography>
+        <Typography
+          variant="h2"
+          sx={{
+            color: theme.palette.text.secondary,
+            fontWeight: 400,
+            fontSize: { xs: "1.05rem", md: "1.25rem" },
+            lineHeight: 1.5,
+            mb: 4,
+          }}
+        >
+          Scan a URL, HTML file, or pasted code. Get a WCAG report, then use AI
+          explanations to understand how to fix each issue.
+        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          justifyContent="center"
+          alignItems="center"
+        >
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => navigate("/login")}
+            sx={{ minWidth: 220, py: 1.5 }}
+          >
+            Sign in to start a scan
+          </Button>
+          <Button
+            variant="outlined"
+            size="large"
+            onClick={onDemoClick}
+            disabled={demoLoading}
+            sx={{ minWidth: 220, py: 1.5 }}
+          >
+            {demoLoading ? "Starting demo..." : "Try the demo"}
+          </Button>
+        </Stack>
       </Box>
     </Box>
   );

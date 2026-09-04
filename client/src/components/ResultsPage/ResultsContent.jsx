@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { Chip, Stack } from '@mui/material';
 import { ErrorOutline, WarningAmber, InfoOutlined, CheckCircleOutline } from '@mui/icons-material';
 import ViolationItem from './ViolationItem';
 import ResultsTabContent from './ResultsTabContent';
-import { extractAxeResults, getSeverityConfig } from '../../utils/resultsUtils';
+import { extractAxeResults, getSeverityConfig, getNormalizedSeverity } from '../../utils/resultsUtils';
 import aiService from '../../services/aiService';
 
 /**
@@ -16,6 +17,7 @@ const ResultsContent = ({
 }) => {
   const [needsReviewLoading, setNeedsReviewLoading] = useState({});
   const [needsReviewResponse, setNeedsReviewResponse] = useState({});
+  const [severityFilter, setSeverityFilter] = useState("all");
 
   const icons = useMemo(() => ({
     ErrorOutline: (props) => <ErrorOutline {...props} />,
@@ -25,6 +27,10 @@ const ResultsContent = ({
   }), []);
   const { severityMap } = useMemo(() => getSeverityConfig(theme, icons), [theme, icons]);
   const violations = useMemo(() => extractAxeResults(result, 'violations'), [result]);
+  const visibleViolations = useMemo(() => {
+    if (severityFilter === 'all') return violations;
+    return violations.filter((issue) => getNormalizedSeverity(issue) === severityFilter);
+  }, [violations, severityFilter]);
   const passes = useMemo(() => extractAxeResults(result, 'passes'), [result]);
   const incomplete = useMemo(() => extractAxeResults(result, 'incomplete'), [result]);
   const inapplicable = useMemo(() => extractAxeResults(result, 'inapplicable'), [result]);
@@ -68,9 +74,24 @@ const ResultsContent = ({
   };
 
   return (
+    <>
+      {activeTab === 0 && violations.length > 0 && (
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }} role="group" aria-label="Filter violations by severity">
+          {['all', 'critical', 'serious', 'moderate', 'minor'].map((level) => (
+            <Chip
+              key={level}
+              label={level === 'all' ? 'All severities' : level}
+              color={severityFilter === level ? 'primary' : 'default'}
+              onClick={() => setSeverityFilter(level)}
+              variant={severityFilter === level ? 'filled' : 'outlined'}
+              clickable
+            />
+          ))}
+        </Stack>
+      )}
     <ResultsTabContent
       activeTab={activeTab}
-      violations={violations}
+      violations={visibleViolations}
       passes={passes}
       incomplete={incomplete}
       inapplicable={inapplicable}
@@ -81,6 +102,7 @@ const ResultsContent = ({
       needsReviewResponse={needsReviewResponse}
       renderViolationItem={renderViolationItem}
     />
+    </>
   );
 };
 

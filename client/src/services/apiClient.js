@@ -1,31 +1,41 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { getUserFacingError, isOffline } from "../utils/userFacingError";
 
-const getToken = () => localStorage.getItem('accessToken');
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+const getToken = () => localStorage.getItem("accessToken");
 
 const buildUrl = (path) => `${API_BASE_URL}${path}`;
 const REQUEST_TIMEOUT_MS = 30000;
+
+const PUBLIC_AUTH_PATHS = [
+  "/token",
+  "/demo-login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/csrf-token",
+];
 
 const authHeaders = async (extraHeaders = {}) => {
   const token = getToken();
   return {
     ...extraHeaders,
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
-// CSRF token management
 let csrfToken = null;
 
 const getCsrfToken = async () => {
   if (csrfToken) return csrfToken;
 
   try {
-    const response = await fetch(buildUrl('/csrf-token'));
+    const response = await fetch(buildUrl("/csrf-token"));
     const data = await response.json();
     csrfToken = data.csrf_token;
     return csrfToken;
   } catch (error) {
-    console.error('Failed to get CSRF token:', error);
+    console.error("Failed to get CSRF token:", error);
     return null;
   }
 };
@@ -34,11 +44,10 @@ const csrfHeaders = async (extraHeaders = {}) => {
   const token = await getCsrfToken();
   return {
     ...extraHeaders,
-    ...(token ? { 'X-CSRF-Token': token } : {})
+    ...(token ? { "X-CSRF-Token": token } : {}),
   };
 };
 
-// Debounce utility function
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -51,91 +60,132 @@ const debounce = (func, wait) => {
   };
 };
 
+const shouldRedirectOnUnauthorized = (path) =>
+  !PUBLIC_AUTH_PATHS.some((publicPath) => path.startsWith(publicPath));
+
+const redirectExpiredSession = (path, status) => {
+  if (status !== 401 || !shouldRedirectOnUnauthorized(path)) {
+    return;
+  }
+  localStorage.removeItem("accessToken");
+  if (
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/dashboard")
+  ) {
+    window.location.assign("/login");
+  }
+};
+
+const createRequestError = (message, status, data) => {
+  const error = new Error(message);
+  error.status = status;
+  error.response = { status, data };
+  return error;
+};
+
+const parseBody = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+};
+
+const handleFailedResponse = (path, response, data) => {
+  redirectExpiredSession(path, response.status);
+  const message = getUserFacingError(
+    createRequestError(
+      data?.detail || data?.message || `Request failed (${response.status})`,
+      response.status,
+      data,
+    ),
+  );
+  throw createRequestError(message, response.status, data);
+};
+
+const handleNetworkFailure = (error) => {
+  if (error?.status) {
+    throw error;
+  }
+  throw createRequestError(getUserFacingError(error), error?.status);
+};
+
 export const apiJson = async (path, options = {}) => {
-  const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes((options.method || 'POST').toUpperCase());
+  if (isOffline()) {
+    throw createRequestError(getUserFacingError(new Error("offline")));
+  }
+
+  const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(
+    (options.method || "POST").toUpperCase(),
+  );
   const csrfHeader = isStateChanging ? await csrfHeaders() : {};
   const authHeaderValue = await authHeaders();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response;
   try {
-    response = await fetch(buildUrl(path), {
+    const response = await fetch(buildUrl(path), {
       ...options,
       signal: options.signal || controller.signal,
       headers: {
         ...csrfHeader,
         ...authHeaderValue,
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options.headers || {})
-      }
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      },
     });
+
+    const data = await parseBody(response);
+    if (!response.ok) {
+      handleFailedResponse(path, response, data);
+    }
+    return data;
+  } catch (error) {
+    handleNetworkFailure(error);
   } finally {
     clearTimeout(timeoutId);
   }
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    const message = data?.detail || data?.message || `Request failed (${response.status})`;
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
-  }
-
-  return data;
 };
 
 export const apiForm = async (path, formData, options = {}) => {
+  if (isOffline()) {
+    throw createRequestError(getUserFacingError(new Error("offline")));
+  }
+
   const csrfHeader = await csrfHeaders();
   const authHeaderValue = await authHeaders();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response;
   try {
-    response = await fetch(buildUrl(path), {
+    const response = await fetch(buildUrl(path), {
       ...options,
       signal: options.signal || controller.signal,
-      method: options.method || 'POST',
+      method: options.method || "POST",
       headers: {
         ...csrfHeader,
         ...authHeaderValue,
-        ...(options.headers || {})
+        ...(options.headers || {}),
       },
-      body: formData
+      body: formData,
     });
+
+    const data = await parseBody(response);
+    if (!response.ok) {
+      handleFailedResponse(path, response, data);
+    }
+    return data;
+  } catch (error) {
+    handleNetworkFailure(error);
   } finally {
     clearTimeout(timeoutId);
   }
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    const message = data?.detail || data?.message || `Request failed (${response.status})`;
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
-  }
-
-  return data;
 };
 
 export const apiDelete = async (path, options = {}) => {
-  return apiJson(path, { ...options, method: 'DELETE' });
+  return apiJson(path, { ...options, method: "DELETE" });
 };
 
-// Debounced versions for frequently called endpoints
 export const apiJsonDebounced = debounce(apiJson, 300);
 export const apiFormDebounced = debounce(apiForm, 300);
 
@@ -144,5 +194,5 @@ export default {
   apiForm,
   apiDelete,
   apiJsonDebounced,
-  apiFormDebounced
+  apiFormDebounced,
 };

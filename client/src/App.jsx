@@ -18,6 +18,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { useThemeMode } from "./contexts/useThemeMode";
 import { useAuth } from "./contexts/useAuth";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PageLoader from "./components/PageLoader";
+import OfflineBanner from "./components/OfflineBanner";
 const AiChatbot = lazy(
   () => import(/* webpackChunkName: "ai-chatbot" */ "./components/AiChatbot"),
 );
@@ -65,9 +67,8 @@ const DashboardLayout = lazy(
 const ProtectedRoute = () => {
   const { isLoggedIn, loading } = useAuth();
 
-  // Show nothing while checking authentication
   if (loading) {
-    return null;
+    return <PageLoader label="Checking your session..." />;
   }
 
   // Redirect to login if not authenticated
@@ -117,26 +118,48 @@ function AppContent() {
     shape: { borderRadius: 8 },
     components: {
       MuiButton: {
+        defaultProps: { disableElevation: true },
         styleOverrides: {
           root: {
+            minHeight: 44,
             boxShadow: "none",
-            "&:hover": { boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" },
+            "&:hover": { boxShadow: "none" },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            minWidth: 44,
+            minHeight: 44,
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
-          root: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)" },
+          root: { boxShadow: "0px 1px 4px rgba(0, 0, 0, 0.08)" },
         },
       },
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            background: darkMode
-              ? "linear-gradient(135deg, #23272f 0%, #181a1b 100%)"
-              : "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
+            backgroundColor: darkMode ? "#181a1b" : "#f4f6fb",
             minHeight: "100vh",
             width: "100%",
+            overflowWrap: "anywhere",
+          },
+          "*:focus-visible": {
+            outline: `3px solid ${darkMode ? "#8aa4ff" : "#2f4bc7"}`,
+            outlineOffset: "2px",
+          },
+          "@media (prefers-reduced-motion: reduce)": {
+            "html": { scrollBehavior: "auto" },
+            "*, *::before, *::after": {
+              animationDuration: "0.01ms !important",
+              animationIterationCount: "1 !important",
+              transitionDuration: "0.01ms !important",
+              scrollBehavior: "auto !important",
+            },
           },
         },
       },
@@ -172,7 +195,8 @@ function AppContent() {
             </Box>
 
             <BrowserRouter>
-              <Suspense fallback={<Box sx={{ p: 4 }} />}>
+              <OfflineBanner />
+              <Suspense fallback={<PageLoader label="Loading page..." />}>
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Home />} />
@@ -196,14 +220,24 @@ function AppContent() {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
-              <Suspense fallback={null}>
-                <AiChatbot />
-              </Suspense>
+              <ChatbotHost />
             </BrowserRouter>
           </Box>
         </AuthProvider>
       </ErrorBoundary>
     </MuiThemeProvider>
+  );
+}
+
+function ChatbotHost() {
+  const { isLoggedIn, loading } = useAuth();
+  if (loading || !isLoggedIn) {
+    return null;
+  }
+  return (
+    <Suspense fallback={null}>
+      <AiChatbot />
+    </Suspense>
   );
 }
 
