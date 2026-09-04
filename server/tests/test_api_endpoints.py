@@ -130,7 +130,7 @@ class TestAuthenticationEndpoints:
                 },
                 headers=csrf_headers()
             )
-            assert response.status_code == 400
+            assert response.status_code == 409
             data = response.json()
             assert "already registered" in data["detail"].lower()
 
@@ -231,6 +231,77 @@ class TestRateLimiting:
             # At least one should hit rate limit if properly configured
             # This is a basic check
             assert any(status in [200, 400, 429] for status in responses)
+
+
+class TestSecurityGuardsOnEndpoints:
+    """Tests for recently hardened endpoint behavior."""
+
+    def test_demo_login_disabled_when_not_allowed(self):
+        """Demo login returns 404 when ALLOW_DEMO_LOGIN is false."""
+        with patch('main.ALLOW_DEMO_LOGIN', False):
+            response = client.post("/demo-login")
+            assert response.status_code == 404
+            assert "disabled" in response.json()["detail"].lower()
+
+    def test_ai_metrics_requires_auth(self):
+        """The AI metrics endpoint must not be publicly readable."""
+        response = client.get("/ai/metrics")
+        assert response.status_code == 401
+
+    def test_ai_metrics_with_auth(self, mock_auth):
+        """Authenticated users can read AI metrics."""
+        response = client.get("/ai/metrics")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_requests" in data
+
+    def test_request_id_header_is_set(self):
+        """Every response carries an X-Request-ID header for tracing."""
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.headers.get("X-Request-ID")
+
+    def test_history_uses_projection(self, mock_auth):
+        """History listing excludes the bulky result/summary payloads."""
+        with patch('main.analyses_col') as mock_analyses:
+            mock_analyses.find.return_value = EmptyCursor()
+            mock_analyses.count_documents = AsyncMock(return_value=0)
+
+            response = client.get("/history")
+            assert response.status_code == 200
+            _, kwargs = mock_analyses.find.call_args
+            projection = kwargs["projection"]
+            assert projection.get("result") == 0
+            assert projection.get("summary") == 0
+
+    def test_forgot_password_rate_limited(self):
+        """Forgot-password endpoint is rate limited."""
+        with patch('main.users_col') as mock_users:
+            mock_users.find_one = AsyncMock(return_value=None)
+            responses = []
+            for _ in range(6):
+                response = client.post(
+                    "/forgot-password",
+                    json={"email": "ratelimit@example.com"},
+                    headers=csrf_headers()
+                )
+                responses.append(response.status_code)
+            assert 429 in responses
+
+    def test_ai_errors_do_not_leak_internal_details(self, mock_auth):
+        """AI endpoint 500 responses must not include provider exceptions."""
+        with patch('main.chat_completion', side_effect=RuntimeError("secret provider detail")):
+            response = client.post(
+                "/ai/chat",
+                json={
+                    "messages": [{"role": "user", "content": "What is alt text?"}],
+                    "model": "gemini-2.5-flash",
+                },
+                headers=csrf_headers(),
+            )
+        assert response.status_code == 500
+        response_json = response.json()
+        assert "secret provider detail" not in response_json.get("detail", "")
 
 
 if __name__ == "__main__":

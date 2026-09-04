@@ -26,18 +26,19 @@ AI_METRICS = {
 }
 
 def initialize_gemini():
-    """Initialize Gemini AI configuration."""
+    """Initialize Gemini AI configuration and verify real service availability."""
     global GEMINI_CONFIGURED
     
     if not GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY is not set. AI features will not work.")
+        GEMINI_CONFIGURED = False
         return False
     
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Test the API key by creating a simple model instance
-        # Using gemini-2.5-flash which is more widely available
-        test_model = genai.GenerativeModel("gemini-2.5-flash")
+        # Verify the key against a lightweight real service call before
+        # accepting it as configured.
+        genai.list_models(page_size=1)
         GEMINI_CONFIGURED = True
         logger.info("Gemini AI configured successfully")
         return True
@@ -161,7 +162,7 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
         record_ai_metric("failed_request", 1)
         logger.error(f"Gemini API error: {str(e)}")
         return {
-            "error": f"Gemini API error: {str(e)}",
+            "error": "Gemini API error",
             "content": "Sorry, I'm having trouble processing your request right now."
         }
 
@@ -176,7 +177,7 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
         Dict containing fixed code and brief explanation
     """
     start_time = datetime.utcnow()
-    record_ai_metric("total_requests", 1)
+    record_ai_metric("request_started", 1)
     
     # Check cache first
     issue_id = issue.get('id', 'unknown')
@@ -218,7 +219,13 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.4,
+                max_output_tokens=1024,
+            ),
+        )
         response_text = response.text
         
         # Parse the simple response
@@ -283,7 +290,10 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
             # If fixed code is too short or empty, use original
             fixed_code = html_code
             explanation = "AI provided incomplete response. Please refer to the original code and accessibility guidelines."
-        
+
+        # Defense-in-depth: strip anything executable from the generated snippet.
+        fixed_code = content_filter.sanitize_html_output(fixed_code or "")
+
         result = {
             "fixedCode": fixed_code,
             "explanation": explanation,
@@ -313,11 +323,14 @@ def generate_fallback_explanation(issue: Dict[str, Any]) -> Dict[str, Any]:
     rule_id = issue.get('id', 'Unknown Rule')
     description = issue.get('help', issue.get('description', 'No description available'))
     impact = issue.get('impact', issue.get('severity', 'unknown'))
-    
+    original_code = issue.get('nodes', [{}])[0].get('html', 'No HTML code available') if issue.get('nodes') else 'No HTML code available'
+
+    explanation = f"This is a {impact} level accessibility issue related to {rule_id}. {description}"
     return {
-        "explanation": f"This is a {impact} level accessibility issue related to {rule_id}. {description}",
+        "explanation": explanation,
+        "fixedCode": "AI service is currently unavailable for code suggestions.",
         "fix": "Please refer to the WCAG guidelines and the help URL for detailed fix instructions.",
-        "beforeCode": issue.get('nodes', [{}])[0].get('html', 'No HTML code available') if issue.get('nodes') else 'No HTML code available',
+        "beforeCode": original_code,
         "afterCode": "AI service is currently unavailable for code suggestions.",
         "impact": impact,
         "ruleId": rule_id

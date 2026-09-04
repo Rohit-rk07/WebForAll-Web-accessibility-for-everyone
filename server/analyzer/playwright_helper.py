@@ -4,9 +4,12 @@
 import sys
 import asyncio
 import json
+import ipaddress
 import logging
+import socket
 import traceback
 from typing import Dict, Any, List
+from urllib.parse import urlsplit
 
 import requests
 from playwright.async_api import async_playwright
@@ -18,6 +21,64 @@ _PLAYWRIGHT = None
 _BROWSER = None
 _AXE_SOURCE = None
 _AXE_URL = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js"
+
+
+def _hostname_is_public(hostname: str, port: int | None = None) -> bool:
+    """Resolve ``hostname`` now and verify every address is globally routable.
+
+    This is evaluated at request time (not just at analysis start) to defeat
+    DNS-rebinding attacks: the browser's own connection is the one being
+    validated, including across redirects.
+    """
+    hostname = hostname.rstrip(".").lower()
+    if not hostname:
+        return False
+    try:
+        addresses = socket.getaddrinfo(hostname, port or None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return False
+    for address in {item[4][0] for item in addresses}:
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            return False
+        if not ip.is_global:
+            return False
+    return True
+
+
+class SSRFRequestGuard:
+    """Aborts any request (initial navigation, redirects, subresources) that
+    points to a non-public destination."""
+
+    def __init__(self):
+        self._dns_cache: Dict[str, bool] = {}
+
+    async def handle(self, route):
+        request = route.request
+        url = request.url
+        parts = urlsplit(url)
+
+        # Non-network documents are intrinsic to the analyzer's own operation.
+        if parts.scheme in ("data", "about", "blob", "javascript"):
+            await route.continue_()
+            return
+
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            logger.warning(f"Blocking request with unsupported scheme: {url}")
+            await route.abort("blockedbyclient")
+            return
+
+        hostname = parts.hostname.rstrip(".").lower()
+        if hostname not in self._dns_cache:
+            self._dns_cache[hostname] = _hostname_is_public(hostname, parts.port)
+
+        if not self._dns_cache[hostname]:
+            logger.warning(f"Blocking SSRF-prone request to: {url}")
+            await route.abort("blockedbyclient")
+            return
+
+        await route.continue_()
 
 
 def get_wcag_tags(wcag_options: Dict[str, Any]) -> List[str]:
@@ -155,8 +216,18 @@ async def run_analysis(data: Dict[str, Any]):
             )
             page = await context.new_page()
 
+            # Enforce anti-SSRF policy on every request the page makes,
+            # including redirects and subresources (DNS-rebinding safe).
+            ssrf_guard = SSRFRequestGuard()
+            await page.route("**/*", ssrf_guard.handle)
+
             logger.info(f"Navigating to URL: {url}")
-            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            await page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=45000,
+                max_redirects=5,
+            )
 
             logger.info("Waiting for page to settle...")
             try:

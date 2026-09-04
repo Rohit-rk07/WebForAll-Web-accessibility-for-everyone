@@ -85,7 +85,13 @@ const Navbar = () => {
         <Toolbar>
           {/* Logo and Brand - different destination based on login status */}
           <Box
-            onClick={() => navigate(isLoggedIn ? "/dashboard/home" : "/")}
+            component="a"
+            href={isLoggedIn ? "/dashboard/home" : "/"}
+            onClick={(event) => {
+              event.preventDefault();
+              navigate(event.currentTarget.getAttribute("href"));
+            }}
+            aria-label="Accessibility Analyzer home"
             sx={{
               display: "flex",
               alignItems: "center",
@@ -136,6 +142,9 @@ const Navbar = () => {
             ) : (
               <IconButton
                 onClick={handleUserMenuOpen}
+                aria-label="Open user menu"
+                aria-haspopup="menu"
+                aria-expanded={Boolean(userMenuAnchor)}
                 sx={{ color: COLORS.text }}
               >
                 <AccountCircle />

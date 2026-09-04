@@ -161,3 +161,46 @@ If your password has special characters like `@`, `#`, `/`, or `:`, URL-encode t
 - `server/.env` and `client/.env` are ignored by git.
 - The backend stores analysis history in MongoDB.
 - The analysis step can take a while because it launches a browser and runs accessibility checks.
+
+## 7. Production Deployment Checklist
+
+Before deploying to production, complete the following:
+
+### Backend Secrets (rotate all before first production deploy!)
+- `SECRET_KEY` — **rotate to a new 32+ character random string** (current default is weak)
+- `CSRF_SECRET` — rotate independently from SECRET_KEY
+- `MONGODB_URI` — ensure it points to a production Atlas cluster with restricted network access
+- `GEMINI_API_KEY` — use a production API key with appropriate quotas
+- `DEMO_USER_PASSWORD` / `ADMIN_USER_PASSWORD` — **must be strong** if `SEED_DEFAULT_USERS=true` (recommended: leave false in production)
+- `SEED_DEFAULT_USERS=false` — **must be false** in production (default when `APP_ENV=production`)
+
+### Security Configuration
+- `APP_ENV=production` — disables demo login and seeding by default
+- `ALLOW_DEMO_LOGIN=false` — ensures demo endpoint is hidden
+- `ALLOWED_ORIGINS` — set to your exact production frontend domain(s) only
+- `TRUSTED_PROXY_IPS` — set to your load balancer / reverse proxy IPs for correct rate-limiting and client IP detection behind proxies
+
+### Frontend
+- `VITE_API_URL` — set to your production backend URL (e.g., `https://api.example.com`)
+- Alternatively, inject at runtime via `window.__APP_CONFIG__.API_URL` in your index.html
+
+### Infrastructure
+- Deploy backend on a platform that supports non-root containers (Render, Railway, Fly.io, etc.)
+- Playwright requires `--no-sandbox` in containerized environments; ensure the container runs as a non-root user
+- Configure health checks on `/health` and `/health/playwright`
+- Enable HTTPS/TLS termination at the load balancer
+- Set up monitoring/alerting on error rates, latency, and AI endpoint quota
+
+### Post-Deploy Verification
+- Verify `/health` returns `healthy`
+- Verify `/health/playwright` returns browser status (no env var leakage)
+- Test authentication flow (register, login, token refresh)
+- Test an analysis scan end-to-end
+- Test AI chat / explain endpoints
+- Confirm rate limits trigger correctly
+- Confirm CSRF tokens are required on state-changing requests
+- Confirm `X-Request-ID` header appears on responses for tracing
+
+---
+
+**Important:** The default `.env.example` files contain weak placeholder secrets. **You must generate and use strong, unique secrets for every production deployment.** Rotate them immediately if they were ever exposed.

@@ -31,7 +31,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from itsdangerous import URLSafeTimedSerializer
 from bs4 import BeautifulSoup
@@ -66,7 +65,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configure rate limiting
-limiter = Limiter(key_func=get_remote_address)
+# Behind a reverse proxy the client IP is only trusted when the request arrives
+# from an explicitly configured proxy IP; X-Forwarded-For from arbitrary clients
+# is ignored to prevent header spoofing.
+TRUSTED_PROXY_IPS = {
+    ip.strip()
+    for ip in os.environ.get("TRUSTED_PROXY_IPS", "").split(",")
+    if ip.strip()
+}
+
+
+def get_client_ip(request: Request) -> str:
+    """Return the real client IP for rate limiting, ignoring spoofable headers by default."""
+    if request.client:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded and request.client.host in TRUSTED_PROXY_IPS:
+            return forwarded.split(",")[0].strip()
+        return request.client.host
+    return "unknown"
+
+
+limiter = Limiter(key_func=get_client_ip)
 
 # Configure CSRF protection using signed tokens
 SECRET_KEY = os.environ.get("SECRET_KEY")
@@ -150,7 +169,8 @@ async def lifespan(app: FastAPI):
 
 async def initialize_gemini_async():
     """Async wrapper for Gemini initialization."""
-    if initialize_gemini():
+    configured = await asyncio.to_thread(initialize_gemini)
+    if configured:
         logger.info("AI services initialized successfully")
     else:
         logger.warning("AI services initialization failed")
@@ -164,6 +184,41 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Assigns a request ID to every request and logs structured metadata."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request.state.request_id = request_id
+        start = datetime.utcnow()
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        duration_ms = (datetime.utcnow() - start).total_seconds() * 1000
+        logger.info(
+            f"{request.method} {request.url.path} -> {response.status_code} "
+            f"({duration_ms:.1f}ms) request_id={request_id}"
+        )
+        return response
+
+
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Return a generic, safe 500 response for any unhandled error."""
+    request_id = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+    logger.error(
+        f"Unhandled error for request_id={request_id}: {exc}",
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    from starlette.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"An unexpected error occurred. Reference: {request_id}"},
+    )
+
+
+app.add_exception_handler(Exception, unhandled_exception_handler)
+app.add_middleware(RequestContextMiddleware)
 
 # Add CORS middleware
 # Add CORS middleware
@@ -236,7 +291,7 @@ async def validate_public_url(url: str) -> None:
 
     for address in {item[4][0] for item in addresses}:
         ip = ipaddress.ip_address(address)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if not ip.is_global:
             raise HTTPException(status_code=400, detail="Private and internal URLs are not allowed")
 
 def require_successful_analysis(result):
@@ -286,7 +341,7 @@ async def register_user(request: Request, user: UserCreate, background_tasks: Ba
     existing = await users_col.find_one({"email": user.email})
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered"
         )
     
@@ -306,9 +361,10 @@ async def register_user(request: Request, user: UserCreate, background_tasks: Ba
     return {"message": "User registered successfully", "email": user.email}
 
 @app.post("/forgot-password", tags=["Authentication"])
-async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks):
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, reset_request: PasswordResetRequest, background_tasks: BackgroundTasks):
     """Request password reset."""
-    existing = await users_col.find_one({"email": request.email})
+    existing = await users_col.find_one({"email": reset_request.email})
     if not existing:
         # Don't reveal if email exists or not for security
         return {"message": "If the email exists, a password reset link has been sent"}
@@ -316,7 +372,7 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
     # Cooldown: prevent spamming reset emails
     try:
         # Find the most recent token for this email
-        last = await prt_col.find_one({"email": request.email}, sort=[("created_at", -1)])
+        last = await prt_col.find_one({"email": reset_request.email}, sort=[("created_at", -1)])
     except Exception:
         last = None
 
@@ -332,19 +388,20 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
     reset_token_hash = hashlib.sha256(reset_token.encode("utf-8")).hexdigest()
     await prt_col.insert_one({
         "token_hash": reset_token_hash,
-        "email": request.email,
+        "email": reset_request.email,
         # TTL index on expiresAt will auto-delete
         "expiresAt": now + timedelta(hours=1),
         "created_at": now,
     })
     
     # Send reset email
-    background_tasks.add_task(send_password_reset_email, request.email, reset_token)
+    background_tasks.add_task(send_password_reset_email, reset_request.email, reset_token)
     
     return {"message": "If the email exists, a password reset link has been sent"}
 
 @app.post("/reset-password", tags=["Authentication"])
-async def reset_password(reset_data: PasswordReset):
+@limiter.limit("10/minute")
+async def reset_password(request: Request, reset_data: PasswordReset):
     """Reset user password using token."""
     token_hash = hashlib.sha256(reset_data.token.encode("utf-8")).hexdigest()
     token_doc = await prt_col.find_one_and_delete({
@@ -386,7 +443,7 @@ async def get_csrf_token():
     return {"csrf_token": token}
 
 @app.get("/ai/metrics", tags=["AI"])
-async def get_ai_metrics():
+async def get_ai_metrics(current_user: User = Depends(get_current_active_user)):
     """
     Get AI service performance metrics.
     Provides insights into AI usage, response times, and cache effectiveness.
@@ -397,34 +454,38 @@ async def get_ai_metrics():
 @app.post("/demo-login", response_model=Token, tags=["Authentication"])
 @limiter.limit("5/minute")
 async def demo_login(request: Request):
+    """Demo login endpoint that generates a temporary demo token without exposing credentials.
+
+    Uses the seeded test user from the database. Disabled unless ALLOW_DEMO_LOGIN=true.
     """
     if not ALLOW_DEMO_LOGIN:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo login is disabled")
 
-    Demo login endpoint that generates a temporary demo token without exposing credentials.
-    Uses the seeded test user from the database.
-    """
+    demo_email = os.environ.get("DEMO_USER_EMAIL", "test@example.com")
+    demo_password = os.environ.get("DEMO_USER_PASSWORD", "password123")
     try:
         # Authenticate with the seeded demo user
-        demo_user = await authenticate_user(None, "test@example.com", "password123")
-        
+        demo_user = await authenticate_user(None, demo_email, demo_password)
+
         if not demo_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Demo user not found. Please ensure the database is properly seeded."
             )
-        
+
         # Generate access token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": demo_user.email}, expires_delta=access_token_expires
         )
-        
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
             "user": demo_user.model_dump(exclude={"hashed_password"}),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Demo login error: {str(e)}")
         raise HTTPException(
@@ -598,10 +659,16 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
                 detail="Only HTML files are supported"
             )
         
-        # Read file content
-        content = await file.read()
-        if len(content) > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="HTML files must be 5 MB or smaller")
+        # Read file content in bounded chunks so oversized uploads are rejected
+        # before the entire file is buffered in memory.
+        content = b""
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            content += chunk
+            if len(content) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="HTML files must be 5 MB or smaller")
         try:
             html_content = content.decode('utf-8')
         except UnicodeDecodeError:
@@ -662,39 +729,48 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
 @limiter.limit("30/minute")
 async def ai_chat_completion(request: Request, payload: ChatCompletionRequest, current_user: User = Depends(get_current_active_user)):
     """Proxy for Gemini's chat completion API."""
+    request_id = getattr(request.state, "request_id", "unknown")
     try:
         messages = [{"role": msg.role, "content": msg.content} for msg in payload.messages]
-        response = chat_completion(
+        response = await asyncio.to_thread(
+            chat_completion,
             messages=messages,
             model=payload.model,
             temperature=payload.temperature,
-            max_tokens=payload.max_tokens
+            max_tokens=payload.max_tokens,
         )
         return response
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"AI chat error: {str(e)}")
+        logger.error(f"AI chat error (request_id={request_id}): {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI service error: {str(e)}"
+            detail=f"AI service is temporarily unavailable. Reference: {request_id}"
         )
 
 @app.post("/ai/explain", tags=["AI"])
 @limiter.limit("30/minute")
 async def ai_explain_issue(request: Request, payload: ExplainRequest, current_user: User = Depends(get_current_active_user)):
     """Generate an explanation and fix for an accessibility issue."""
+    request_id = getattr(request.state, "request_id", "unknown")
     try:
-        response = explain_accessibility_issue(payload.issue)
+        response = await asyncio.to_thread(explain_accessibility_issue, payload.issue)
         return response
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"AI explain error: {str(e)}")
+        logger.error(f"AI explain error (request_id={request_id}): {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI service error: {str(e)}"
+            detail=f"AI service is temporarily unavailable. Reference: {request_id}"
         )
+
 @app.post("/ai/summary", tags=["AI"])
 @limiter.limit("30/minute")
 async def ai_summary(request: Request, payload: SummaryRequest, current_user: User = Depends(get_current_active_user)):
     """Generate a simple summary for accessibility results."""
+    request_id = getattr(request.state, "request_id", "unknown")
     try:
         results = payload.results
         violations = results.get("violations", []) if isinstance(results, dict) else []
@@ -732,11 +808,13 @@ async def ai_summary(request: Request, payload: SummaryRequest, current_user: Us
             },
             "severity": severity_counts,
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"AI summary error: {str(e)}")
+        logger.error(f"AI summary error (request_id={request_id}): {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI summary error: {str(e)}"
+            detail=f"AI service is temporarily unavailable. Reference: {request_id}"
         )
 
 # ============================================================================
@@ -763,7 +841,22 @@ async def list_history(limit: int = 50, skip: int = 0, current_user: User = Depe
     limit = max(1, min(limit, 100))  # Max 100 items per page
     skip = max(0, skip)
     
-    cursor = analyses_col.find({"owner_email": current_user.email}).sort("created_at", -1).skip(skip).limit(limit)
+    # Omit the bulky result/summary payloads from the list view
+    projection = {
+        "_id": 1,
+        "owner_email": 0,
+        "input_type": 1,
+        "input_ref": 1,
+        "wcag_options": 1,
+        "violations_count": 1,
+        "created_at": 1,
+        "result": 0,
+        "summary": 0,
+    }
+    cursor = analyses_col.find(
+        {"owner_email": current_user.email},
+        projection=projection,
+    ).sort("created_at", -1).skip(skip).limit(limit)
     items = []
     async for doc in cursor:
         doc["id"] = str(doc.get("_id"))
@@ -809,13 +902,12 @@ async def delete_history_item(item_id: str, current_user: User = Depends(get_cur
 @app.get("/health/playwright", tags=["System"])
 def playwright_health_check():
     """Check if Playwright browsers are properly installed."""
-    import subprocess
     from datetime import datetime
-    
+
     try:
         # Lightweight browser availability check only; avoid running a full analysis on health probes.
-        import subprocess
         try:
+            import subprocess
             browser_check = subprocess.run(
                 ["playwright", "install", "--dry-run"],
                 capture_output=True,
@@ -825,7 +917,7 @@ def playwright_health_check():
             browser_status = f"Exit code: {browser_check.returncode}, Output: {browser_check.stdout[:200]}"
         except Exception as e:
             browser_status = f"Browser check failed: {str(e)}"
-        
+
         return {
             "status": "healthy" if "failed" not in browser_status.lower() else "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
@@ -842,10 +934,6 @@ def playwright_health_check():
                 "mode": "health_check",
                 "tags_used": []
             },
-            "environment_vars": {
-                "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),
-                "PATH": os.environ.get("PATH", "Not set")[:200] + "..." if len(os.environ.get("PATH", "")) > 200 else os.environ.get("PATH", "Not set")
-            }
         }
     except Exception as e:
         return {
@@ -853,10 +941,6 @@ def playwright_health_check():
             "timestamp": datetime.utcnow().isoformat(),
             "playwright_available": False,
             "error": str(e),
-            "environment_vars": {
-                "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "Not set"),
-                "PATH": os.environ.get("PATH", "Not set")[:200] + "..." if len(os.environ.get("PATH", "")) > 200 else os.environ.get("PATH", "Not set")
-            }
         }
 
 if __name__ == "__main__":

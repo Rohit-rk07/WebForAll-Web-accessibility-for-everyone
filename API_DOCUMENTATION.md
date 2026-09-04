@@ -253,21 +253,26 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "message": "How do I fix color contrast issues?",
-  "context": {
-    "url": "https://example.com"
-  }
+  "messages": [
+    {"role": "user", "content": "How do I fix color contrast issues?"}
+  ],
+  "model": "gemini-2.5-flash",
+  "temperature": 0.7,
+  "max_tokens": 1000
 }
 ```
 
 **Response:**
 ```json
 {
-  "response": "To fix color contrast issues, ensure the ratio between text and background colors meets WCAG AA standards (4.5:1 for normal text, 3:1 for large text)...",
+  "content": "To fix color contrast issues, ensure the ratio between text and background colors meets WCAG AA standards (4.5:1 for normal text, 3:1 for large text)...",
   "model": "gemini-2.5-flash",
+  "usage": {
+    "total_tokens": 42
+  },
   "metrics": {
     "response_time_ms": 1250,
-    "cached": false
+    "filter_confidence": 0.8
   }
 }
 ```
@@ -340,7 +345,13 @@ Content-Type: application/json
 ### AI Metrics
 
 #### GET /ai/metrics
-Get AI service performance metrics.
+Get AI service performance metrics. Requires authentication.
+
+**Request:**
+```http
+GET /ai/metrics
+Authorization: Bearer <token>
+```
 
 **Response:**
 ```json
@@ -471,9 +482,15 @@ All endpoints may return error responses:
 |----------|------------|
 | /token | 5 requests/minute |
 | /register | 3 requests/minute |
-| /forgot-password | 1 request/2 minutes |
-| /ai/* | 10 requests/minute |
-| /analyze/* | 20 requests/minute |
+| /demo-login | 5 requests/minute |
+| /forgot-password | 5 requests/minute |
+| /reset-password | 10 requests/minute |
+| /ai/* | 30 requests/minute |
+| /analyze/url | 10 requests/minute |
+| /analyze/html | 10 requests/minute |
+| /analyze/file | 10 requests/minute |
+
+Rate limit headers are included in responses:
 
 Rate limit headers are included in responses:
 - `X-RateLimit-Limit`: Total requests allowed

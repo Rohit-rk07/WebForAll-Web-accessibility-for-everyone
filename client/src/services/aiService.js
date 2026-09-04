@@ -5,8 +5,6 @@
 
 import { apiJson } from './apiClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 /**
  * Get an AI explanation for an accessibility issue
  * @param {Object} issue - The issue object to explain

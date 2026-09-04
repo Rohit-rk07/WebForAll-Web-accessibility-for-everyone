@@ -47,3 +47,10 @@ class ExplainRequest(BaseModel):
 class SummaryRequest(BaseModel):
     """Request model for generating accessibility summaries."""
     results: Dict[str, Any] = Field(min_length=1)
+
+    @field_validator("results")
+    @classmethod
+    def limit_results_size(cls, value):
+        if len(json.dumps(value)) > 2 * 1024 * 1024:
+            raise ValueError("Results payload is too large")
+        return value

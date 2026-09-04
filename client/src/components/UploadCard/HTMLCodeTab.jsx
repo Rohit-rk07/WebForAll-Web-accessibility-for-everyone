@@ -62,12 +62,11 @@ const HTMLCodeTab = ({
         return;
       }
 
-      // Fallback: format locally and pass up
+// Fallback: format locally and pass up
       const formattedResult = {
         ...result,
         results: result?.results || {},
         mode: result?.mode || 'dynamic',
-        id: Date.now() + Math.random(),
         name: 'HTML Analysis',
         url: '',
         score: result?.score || (result?.results && result?.results?.score) || 0,

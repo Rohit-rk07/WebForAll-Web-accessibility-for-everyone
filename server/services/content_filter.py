@@ -21,24 +21,33 @@ class ContentFilter:
     and filter out harmful content.
     """
     
-    # Accessibility-related keywords (allow-list)
+    # Accessibility-related keyword stems (allow-list).
+    # Stems are intentionally broad so normal accessibility language such as
+    # "accessible", "readability" or "screen readers" is never blocked.
     ACCESSIBILITY_KEYWORDS = [
-        'accessibility', 'wcag', 'ada', '508', 'screen reader', 'aria', 'alt text',
-        'keyboard navigation', 'focus management', 'color contrast', 'semantic html',
-        'assistive technology', 'caption', 'transcript', 'landmark', 'heading',
+        'accessib', 'wcag', 'ada', '508', 'screen read', 'aria', 'alt text',
+        'keyboard', 'focus', 'contrast', 'semantic', 'assistive technology',
+        'caption', 'transcript', 'landmark', 'heading', 'header', 'footer',
         'alt', 'title', 'label', 'role', 'tabindex', 'skip link', 'error message',
-        'form validation', 'landmark', 'region', 'navigation', 'main', 'header',
-        'footer', 'aside', 'section', 'article', 'ul', 'ol', 'dl', 'table',
-        'caption', 'th', 'scope', 'aria-live', 'aria-atomic', 'aria-busy',
-        'aria-controls', 'aria-current', 'aria-describedby', 'aria-details',
-        'aria-disabled', 'aria-dropeffect', 'aria-errormessage', 'aria-flowto',
-        'aria-grabbed', 'aria-haspopup', 'aria-hidden', 'aria-invalid', 'aria-keyshortcuts',
+        'form validation', 'region', 'navigation', 'main', 'aside', 'section',
+        'article', 'ul', 'ol', 'li', 'dl', 'table', 'th', 'td', 'scope',
+        'aria-live', 'aria-atomic', 'aria-busy', 'aria-controls',
+        'aria-current', 'aria-describedby', 'aria-details', 'aria-disabled',
+        'aria-dropeffect', 'aria-errormessage', 'aria-flowto', 'aria-grabbed',
+        'aria-haspopup', 'aria-hidden', 'aria-invalid', 'aria-keyshortcuts',
         'aria-label', 'aria-labelledby', 'aria-level', 'aria-live', 'aria-modal',
         'aria-multiline', 'aria-multiselectable', 'aria-orientation', 'aria-owns',
         'aria-placeholder', 'aria-polite', 'aria-posinset', 'aria-pressed',
         'aria-readonly', 'aria-relevant', 'aria-required', 'aria-roledescription',
-        'aria-rowcount', 'aria-rowindex', 'aria-rowspan', 'aria-selected', 'aria-setsize',
-        'aria-sort', 'aria-valuemax', 'aria-valuemin', 'aria-valuenow', 'aria-valuetext'
+        'aria-rowcount', 'aria-rowindex', 'aria-rowspan', 'aria-selected',
+        'aria-setsize', 'aria-sort', 'aria-valuemax', 'aria-valuemin',
+        'aria-valuenow', 'aria-valuetext', 'visib', 'readab', 'legib', 'color',
+        'colour', 'font', 'button', 'link', 'image', 'img', 'style', 'css',
+        'html', 'web', 'page', 'website', 'site', 'app', 'report', 'result',
+        'fix', 'issue', 'violation', 'test', 'check', 'rule', 'element',
+        'tag', 'attribute', 'content', 'design', 'user', 'help', 'how',
+        'zoom', 'magnif', 'voice', 'speech', 'motion', 'animation',
+        'prefers', 'language', 'reduced', 'html lang', 'lang'
     ]
     
     # Potentially harmful content patterns (block-list)
@@ -49,17 +58,23 @@ class ContentFilter:
         r'racist', r'sexist', r'discriminat', r'hate\s', r'extremist'
     ]
     
-    # Code execution patterns (block-list)
+    # Code execution patterns (block-list).
+    # Event-handler names are enumerated so innocuous text such as "one=",
+    # "caption" or "button" is never mis-flagged as executable code.
     CODE_EXECUTION_PATTERNS = [
         r'eval\s*\(', r'exec\s*\(', r'system\s*\(', r'shell_exec\s*\(',
-        r'passthru\s*\(', r'backtick\s*\(', r'popen\s*\(', r'proc_open\s*\(',
-        r'<script[^>]*>', r'on\w+\s*=', r'javascript\s*:', r'data\s*:\s*text/html'
+        r'passthru\s*\(', r'popen\s*\(', r'proc_open\s*\(',
+        r'<script[^>]*>', r'javascript\s*:', r'data\s*:\s*text/html',
+        r'\bon(?:click|dblclick|load|error|change|submit|focus|blur|mouseover|mouseout|mousedown|mouseup|keydown|keyup|keypress|input|select|reset|resize|scroll|unload|contextmenu)\s*=',
     ]
     
     def __init__(self):
         """Initialize the content filter."""
+        # Stem-based allow-list: match at a word start without requiring a word
+        # boundary afterwards so inflections (accessible, captions, headings...)
+        # are recognized.
         self.accessibility_pattern = re.compile(
-            r'\b(' + '|'.join(re.escape(kw) for kw in self.ACCESSIBILITY_KEYWORDS) + r')\b',
+            r'\b(' + '|'.join(re.escape(kw) for kw in self.ACCESSIBILITY_KEYWORDS) + ')',
             re.IGNORECASE
         )
         self.harmful_pattern = re.compile(

@@ -166,7 +166,7 @@ ${aiSuggestion.fixedCode}
       sx={{ 
         mb: 2,
         border: `1px solid ${theme.palette.divider}`,
-        borderLeft: `4px solid ${severityConfig.color === 'error' ? theme.palette.error.main : theme.palette.warning.main}`,
+        borderLeft: `4px solid ${theme.palette[severityConfig.color]?.main || theme.palette.info.main}`,
         borderRadius: 1,
         '&:before': { display: 'none' }
       }}

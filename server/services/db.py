@@ -42,24 +42,33 @@ async def init_indexes():
 
 
 async def seed_default_users(get_password_hash):
-    """Seed default users if not present."""
+    """Seed default users if not present.
+
+    Enabled only when SEED_DEFAULT_USERS=true (defaults to true outside production).
+    Credentials are configurable via env and MUST be overridden/disabled in production.
+    """
     if os.environ.get("SEED_DEFAULT_USERS", "true" if os.environ.get("APP_ENV", "development").lower() != "production" else "false").lower() != "true":
         return
-    existing_test = await users.find_one({"email": "test@example.com"})
+    demo_email = os.environ.get("DEMO_USER_EMAIL", "test@example.com")
+    demo_password = os.environ.get("DEMO_USER_PASSWORD", "password123")
+    admin_email = os.environ.get("ADMIN_USER_EMAIL", "admin@example.com")
+    admin_password = os.environ.get("ADMIN_USER_PASSWORD", "admin123")
+
+    existing_test = await users.find_one({"email": demo_email})
     if not existing_test:
         await users.insert_one({
-            "email": "test@example.com",
-            "full_name": "Test User",
-            "hashed_password": get_password_hash("password123"),
+            "email": demo_email,
+            "full_name": os.environ.get("DEMO_USER_NAME", "Test User"),
+            "hashed_password": get_password_hash(demo_password),
             "disabled": False,
             "created_at": datetime.utcnow(),
         })
-    existing_admin = await users.find_one({"email": "admin@example.com"})
+    existing_admin = await users.find_one({"email": admin_email})
     if not existing_admin:
         await users.insert_one({
-            "email": "admin@example.com",
-            "full_name": "Admin User",
-            "hashed_password": get_password_hash("admin123"),
+            "email": admin_email,
+            "full_name": os.environ.get("ADMIN_USER_NAME", "Admin User"),
+            "hashed_password": get_password_hash(admin_password),
             "disabled": False,
             "created_at": datetime.utcnow(),
         })

@@ -14,9 +14,9 @@ The Accessibility Analyzer uses Google's Gemini AI to provide intelligent assist
 ### Backend (FastAPI)
 - **Gemini API Integration**: Uses Google's Generative AI SDK
 - **Three AI Endpoints**:
-  - `/api/chat/completion`: General chat functionality
-  - `/api/chat/explain`: Explains specific accessibility issues
-  - `/api/chat/summary`: Generates comprehensive reports
+  - `/ai/chat`: General chat functionality
+  - `/ai/explain`: Explains specific accessibility issues
+  - `/ai/summary`: Generates comprehensive reports
 - **Fallback System**: Provides static responses when AI is unavailable
 
 ## Configuration
@@ -48,14 +48,14 @@ The server automatically validates the Gemini configuration on startup:
 
 ### Chat Completion
 ```http
-POST /api/chat/completion
+POST /ai/chat
 Content-Type: application/json
 
 {
   "messages": [
     {"role": "user", "content": "How do I fix color contrast issues?"}
   ],
-  "model": "gemini-pro",
+  "model": "gemini-2.5-flash",
   "temperature": 0.7,
   "max_tokens": 1000
 }
@@ -63,7 +63,7 @@ Content-Type: application/json
 
 ### Issue Explanation
 ```http
-POST /api/chat/explain
+POST /ai/explain
 Content-Type: application/json
 
 {
@@ -77,7 +77,7 @@ Content-Type: application/json
 
 ### Summary Generation
 ```http
-POST /api/chat/summary
+POST /ai/summary
 Content-Type: application/json
 
 {
@@ -138,7 +138,7 @@ Check configuration status:
 
 Test AI endpoints manually:
 ```bash
-curl -X POST http://localhost:8000/api/chat/completion \
+curl -X POST http://localhost:8000/ai/chat \
   -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"Hello"}]}'
 ```

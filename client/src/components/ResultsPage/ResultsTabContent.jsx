@@ -11,6 +11,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Button,
 } from "@mui/material";
 import {
   ExpandMore,
@@ -235,28 +236,21 @@ const ResultsTabContent = ({
                     sx={{ mt: 0.5 }}
                   />
                 </Box>
-                <button
+                <Button
+                  component="span"
+                  startIcon={<SmartToy />}
+                  variant="outlined"
+                  color="warning"
+                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     onNeedsReview(issue, index);
                   }}
                   disabled={needsReviewLoading[index]}
-                  style={{
-                    background: "none",
-                    border: "1px solid currentColor",
-                    borderRadius: "4px",
-                    padding: "4px 12px",
-                    cursor: needsReviewLoading[index]
-                      ? "not-allowed"
-                      : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                  }}
+                  sx={{ ml: "auto" }}
                 >
-                  <SmartToy fontSize="small" />
                   {needsReviewLoading[index] ? "Loading..." : "Needs Review"}
-                </button>
+                </Button>
               </Box>
             </AccordionSummary>
 
@@ -333,7 +327,8 @@ const ResultsTabContent = ({
                   >
                     {needsReviewResponse[index].explanation}
                   </Typography>
-                  {needsReviewResponse[index].fix && (
+                  {needsReviewResponse[index].fixedCode ||
+                  needsReviewResponse[index].fix ? (
                     <Box>
                       <Typography
                         variant="subtitle2"
@@ -345,10 +340,11 @@ const ResultsTabContent = ({
                         variant="body2"
                         sx={{ whiteSpace: "pre-line" }}
                       >
-                        {needsReviewResponse[index].fix}
+                        {needsReviewResponse[index].fixedCode ||
+                          needsReviewResponse[index].fix}
                       </Typography>
                     </Box>
-                  )}
+                  ) : null}
                 </Box>
               )}
 
