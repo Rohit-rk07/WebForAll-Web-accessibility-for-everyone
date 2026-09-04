@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def test_basic_playwright():
+def run_basic_playwright():
     """Test basic Playwright functionality."""
     try:
         logger.info("Testing basic Playwright functionality...")
@@ -49,7 +49,7 @@ def test_basic_playwright():
         logger.error(traceback.format_exc())
         return False
 
-def test_axe_integration():
+def run_axe_integration():
     """Test Playwright with axe-core integration."""
     try:
         logger.info("Testing Playwright with axe-core integration...")
@@ -103,7 +103,7 @@ def test_axe_integration():
         logger.error(traceback.format_exc())
         return False
 
-def test_helper_script():
+def run_helper_script():
     """Test the helper script."""
     try:
         logger.info("Testing helper script...")
@@ -135,21 +135,21 @@ def main():
     logger.info("Starting Playwright tests...")
     
     # Test 1: Basic Playwright
-    if test_basic_playwright():
+    if run_basic_playwright():
         logger.info("✅ Basic Playwright test passed")
     else:
         logger.error("❌ Basic Playwright test failed")
         return 1
     
     # Test 2: Axe Integration
-    if test_axe_integration():
+    if run_axe_integration():
         logger.info("✅ Axe integration test passed")
     else:
         logger.error("❌ Axe integration test failed")
         return 1
     
     # Test 3: Helper Script
-    if test_helper_script():
+    if run_helper_script():
         logger.info("✅ Helper script test passed")
     else:
         logger.error("❌ Helper script test failed")

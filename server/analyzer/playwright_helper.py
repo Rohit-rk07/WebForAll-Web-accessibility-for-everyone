@@ -79,7 +79,6 @@ async def get_browser():
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
-        "--disable-web-security",
         "--disable-features=VizDisplayCompositor",
         "--no-first-run",
         "--disable-extensions",

@@ -4,10 +4,15 @@ import os
 import platform
 import logging
 import uuid
+import secrets
 import json
 import asyncio
 import sys
+import ipaddress
+import socket
+import hashlib
 from datetime import timedelta, datetime
+from urllib.parse import urlsplit
 
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -45,7 +50,7 @@ from services import (
 )
 from models import (
     URLAnalysisRequest, HTMLAnalysisRequest, ChatCompletionRequest,
-    ExplainRequest
+    ExplainRequest, SummaryRequest
 )
 
 # Analysis import (keeping the existing dynamic analysis)
@@ -59,17 +64,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
-app = FastAPI(
-    title="Accessibility Analyzer API",
-    description="API for analyzing web accessibility and generating AI-powered explanations",
-    version="2.0"
-)
-
 # Configure rate limiting
 limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CSRF protection using signed tokens
 SECRET_KEY = os.environ.get("SECRET_KEY")
@@ -106,11 +102,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         
         # Skip CSRF for authenticated endpoints (JWT provides protection)
         if request.url.path.startswith("/token") or request.url.path.startswith("/demo-login"):
-            return await call_next(request)
-        
-        # Skip CSRF for authenticated requests with valid JWT
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
             return await call_next(request)
         
         # For other state-changing operations, check CSRF token
@@ -170,6 +161,8 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware
 # Add CORS middleware
@@ -178,6 +171,10 @@ allowed_origins = os.environ.get(
     "ALLOWED_ORIGINS", 
     "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://web-for-all-web-accessibility-for-e.vercel.app"
 ).split(",")
+allowed_origins = [origin.strip() for origin in allowed_origins if origin.strip()]
+
+APP_ENV = os.environ.get("APP_ENV", "development").lower()
+ALLOW_DEMO_LOGIN = os.environ.get("ALLOW_DEMO_LOGIN", "true" if APP_ENV != "production" else "false").lower() == "true"
 
 app.add_middleware(
     CORSMiddleware,
@@ -207,6 +204,32 @@ app.add_middleware(CacheMiddleware)
 
 # Add CSRF protection middleware
 app.add_middleware(CSRFMiddleware)
+
+MAX_HTML_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+async def validate_public_url(url: str) -> None:
+    """Reject non-public destinations before launching the browser."""
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Only public HTTP(S) URLs are supported")
+
+    try:
+        addresses = await asyncio.to_thread(
+            socket.getaddrinfo, parsed.hostname, parsed.port, type=socket.SOCK_STREAM
+        )
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="The URL hostname could not be resolved")
+
+    for address in {item[4][0] for item in addresses}:
+        ip = ipaddress.ip_address(address)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise HTTPException(status_code=400, detail="Private and internal URLs are not allowed")
+
+def require_successful_analysis(result):
+    if not isinstance(result, dict) or result.get("success") is False:
+        raise HTTPException(status_code=502, detail="The accessibility analysis failed")
+    return result
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -292,9 +315,10 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
         return {"message": "If the email exists, a password reset link has been sent"}
 
     # Generate reset token
-    reset_token = str(uuid.uuid4())
+    reset_token = secrets.token_urlsafe(32)
+    reset_token_hash = hashlib.sha256(reset_token.encode("utf-8")).hexdigest()
     await prt_col.insert_one({
-        "token": reset_token,
+        "token_hash": reset_token_hash,
         "email": request.email,
         # TTL index on expiresAt will auto-delete
         "expiresAt": now + timedelta(hours=1),
@@ -309,8 +333,12 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
 @app.post("/reset-password", tags=["Authentication"])
 async def reset_password(reset_data: PasswordReset):
     """Reset user password using token."""
-    token_doc = await prt_col.find_one({"token": reset_data.token})
-    if not token_doc or token_doc.get("expiresAt") < datetime.utcnow():
+    token_hash = hashlib.sha256(reset_data.token.encode("utf-8")).hexdigest()
+    token_doc = await prt_col.find_one_and_delete({
+        "token_hash": token_hash,
+        "expiresAt": {"$gt": datetime.utcnow()},
+    })
+    if not token_doc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
@@ -328,9 +356,6 @@ async def reset_password(reset_data: PasswordReset):
     from auth.auth_utils import get_password_hash
     await users_col.update_one({"email": email}, {"$set": {"hashed_password": get_password_hash(reset_data.new_password)}})
 
-    # Remove used token
-    await prt_col.delete_one({"token": reset_data.token})
-    
     return {"message": "Password reset successfully"}
 
 @app.get("/users/me", response_model=User, tags=["Authentication"])
@@ -357,8 +382,12 @@ async def get_ai_metrics():
     return get_ai_metrics()
 
 @app.post("/demo-login", response_model=Token, tags=["Authentication"])
-async def demo_login():
+@limiter.limit("5/minute")
+async def demo_login(request: Request):
     """
+    if not ALLOW_DEMO_LOGIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo login is disabled")
+
     Demo login endpoint that generates a temporary demo token without exposing credentials.
     Uses the seeded test user from the database.
     """
@@ -407,6 +436,7 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
     """
     try:
         logger.info(f"Analyzing URL: {request.url}")
+        await validate_public_url(str(request.url))
         
         # Convert wcag_options to dict if provided
         wcag_options = None
@@ -419,12 +449,7 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
         
         # Use dynamic analysis only
         result = await playwright_analyze_url(str(request.url), wcag_options)
-        
-        if result is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Analysis failed - unable to analyze the URL"
-            )
+        result = require_successful_analysis(result)
         
         # Persist analysis for the authenticated user and return its id
         try:
@@ -453,11 +478,13 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
             # Even if persistence fails, return the analysis result without id
             return result
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing URL {request.url}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis failed. Please try again later."
         )
 
 @app.post("/analyze/html", tags=["Analysis"])
@@ -491,12 +518,7 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         
         # Use dynamic analysis with data URL
         result = await playwright_analyze_url(data_url, wcag_options)
-        
-        if result is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Analysis failed - unable to analyze the HTML content"
-            )
+        result = require_successful_analysis(result)
         
         # Persist + return id
         try:
@@ -518,11 +540,13 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
             logger.warning(f"Failed to persist HTML analysis history: {e}")
             return result
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing HTML content: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis failed. Please try again later."
         )
 
 @app.post("/analyze/file", tags=["Analysis"])
@@ -549,7 +573,12 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
         
         # Read file content
         content = await file.read()
-        html_content = content.decode('utf-8')
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="HTML files must be 5 MB or smaller")
+        try:
+            html_content = content.decode('utf-8')
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="The HTML file must be UTF-8 encoded")
         
         # Parse WCAG options if provided
         parsed_wcag_options = None
@@ -567,12 +596,7 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
         
         # Use dynamic analysis with data URL
         result = await playwright_analyze_url(data_url, parsed_wcag_options)
-        
-        if result is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Analysis failed - unable to analyze the uploaded file"
-            )
+        result = require_successful_analysis(result)
         
         # Persist + return id
         try:
@@ -594,11 +618,13 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
             logger.warning(f"Failed to persist file analysis history: {e}")
             return result
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing file {file.filename}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
+            detail="File analysis failed. Please try again later."
         )
 
 # ============================================================================
@@ -606,15 +632,16 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
 # ============================================================================
 
 @app.post("/ai/chat", tags=["AI"])
-async def ai_chat_completion(request: ChatCompletionRequest):
+@limiter.limit("30/minute")
+async def ai_chat_completion(request: Request, payload: ChatCompletionRequest, current_user: User = Depends(get_current_active_user)):
     """Proxy for Gemini's chat completion API."""
     try:
-        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        messages = [{"role": msg.role, "content": msg.content} for msg in payload.messages]
         response = chat_completion(
             messages=messages,
-            model=request.model,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens
+            model=payload.model,
+            temperature=payload.temperature,
+            max_tokens=payload.max_tokens
         )
         return response
     except Exception as e:
@@ -625,10 +652,11 @@ async def ai_chat_completion(request: ChatCompletionRequest):
         )
 
 @app.post("/ai/explain", tags=["AI"])
-async def ai_explain_issue(request: ExplainRequest):
+@limiter.limit("30/minute")
+async def ai_explain_issue(request: Request, payload: ExplainRequest, current_user: User = Depends(get_current_active_user)):
     """Generate an explanation and fix for an accessibility issue."""
     try:
-        response = explain_accessibility_issue(request.issue)
+        response = explain_accessibility_issue(payload.issue)
         return response
     except Exception as e:
         logger.error(f"AI explain error: {str(e)}")
@@ -637,10 +665,11 @@ async def ai_explain_issue(request: ExplainRequest):
             detail=f"AI service error: {str(e)}"
         )
 @app.post("/ai/summary", tags=["AI"])
-async def ai_summary(request: dict):
+@limiter.limit("30/minute")
+async def ai_summary(request: Request, payload: SummaryRequest, current_user: User = Depends(get_current_active_user)):
     """Generate a simple summary for accessibility results."""
     try:
-        results = request.get("results", {}) if isinstance(request, dict) else {}
+        results = payload.results
         violations = results.get("violations", []) if isinstance(results, dict) else []
         passes = results.get("passes", []) if isinstance(results, dict) else []
         incomplete = results.get("incomplete", []) if isinstance(results, dict) else []

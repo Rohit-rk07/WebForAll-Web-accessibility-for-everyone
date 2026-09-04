@@ -1,10 +1,18 @@
-import React, { useEffect, useState, useRef, lazy, Suspense, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  Box, 
-  Paper, 
-  Typography, 
-  Button, 
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  lazy,
+  Suspense,
+  useMemo,
+  useCallback,
+} from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
   CircularProgress,
   IconButton,
   Dialog,
@@ -12,26 +20,26 @@ import {
   DialogContent,
   DialogActions,
   Fab,
-  Tooltip
-} from '@mui/material';
-import { 
-  ArrowBack,
-  Download
-} from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+  Tooltip,
+  Alert,
+} from "@mui/material";
+import { ArrowBack, Download } from "@mui/icons-material";
+import { useTheme } from "@mui/material/styles";
 
 // Import our modular components
-import ScoreCard from '../components/ResultsPage/ScoreCard';
-import ResultsTabs from '../components/ResultsPage/ResultsTabs';
-import ResultsContent from '../components/ResultsPage/ResultsContent';
-const ExportDialog = lazy(() => import('../components/ResultsPage/ExportDialog'));
+import ScoreCard from "../components/ResultsPage/ScoreCard";
+import ResultsTabs from "../components/ResultsPage/ResultsTabs";
+import ResultsContent from "../components/ResultsPage/ResultsContent";
+const ExportDialog = lazy(
+  () => import("../components/ResultsPage/ExportDialog"),
+);
 
 // Import utility functions
-import { 
-  calculateAccessibilityScore, 
-  calculateResultCounts 
-} from '../utils/resultsUtils';
-import { apiJson } from '../services/apiClient';
+import {
+  calculateAccessibilityScore,
+  calculateResultCounts,
+} from "../utils/resultsUtils";
+import { apiJson } from "../services/apiClient";
 
 /**
  * Results Page component
@@ -46,32 +54,40 @@ const ResultsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const resultsRef = useRef(null);
-  const [analyzedUrl, setAnalyzedUrl] = useState('');
-  
+  const [analyzedUrl, setAnalyzedUrl] = useState("");
+  const [loadError, setLoadError] = useState("");
+
   const { id } = useParams();
 
   useEffect(() => {
     const loadById = async () => {
       if (!id) {
-        navigate('/dashboard/home');
+        navigate("/dashboard/home");
         return;
       }
       try {
         const doc = await apiJson(`/history/${id}`);
         const analyzed = doc.result || doc;
         setResult(analyzed);
-        const analyzedUrlValue = analyzed?.url || analyzed?.pageUrl || (doc?.input_type === 'url' ? doc?.input_ref : '');
-        setAnalyzedUrl(analyzedUrlValue || '');
+        const analyzedUrlValue =
+          analyzed?.url ||
+          analyzed?.pageUrl ||
+          (doc?.input_type === "url" ? doc?.input_ref : "");
+        setAnalyzedUrl(analyzedUrlValue || "");
         setLoading(false);
       } catch (e) {
         console.error(e);
-        navigate('/dashboard/home');
+        setLoadError(e.message || "Unable to load this analysis.");
+        setLoading(false);
       }
     };
     loadById();
   }, [id, navigate]);
 
-  const scoreData = useMemo(() => calculateAccessibilityScore(result), [result]);
+  const scoreData = useMemo(
+    () => calculateAccessibilityScore(result),
+    [result],
+  );
   const resultCounts = useMemo(() => calculateResultCounts(result), [result]);
   const score = scoreData.score;
   const totalIssues = scoreData.totalIssues;
@@ -104,19 +120,21 @@ const ResultsPage = () => {
    * Navigate back to dashboard
    */
   const handleBackClick = useCallback(() => {
-    navigate('/dashboard/home');
+    navigate("/dashboard/home");
   }, [navigate]);
 
   if (loading) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '60vh',
-        flexDirection: 'column',
-        gap: 2
-      }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
         <CircularProgress size={60} />
         <Typography variant="h6" color="text.secondary">
           Loading Results...
@@ -127,17 +145,17 @@ const ResultsPage = () => {
 
   if (!result) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '60vh',
-        flexDirection: 'column',
-        gap: 2
-      }}>
-        <Typography variant="h6" color="error">
-          No results found
-        </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+        <Alert severity="error">{loadError || "No results found"}</Alert>
         <Button variant="contained" onClick={handleBackClick}>
           Back to Dashboard
         </Button>
@@ -146,28 +164,46 @@ const ResultsPage = () => {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>
       {/* Header */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Paper
+        elevation={1}
+        sx={{
+          p: 2,
+          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <IconButton onClick={handleBackClick} color="primary">
             <ArrowBack />
           </IconButton>
           <Box>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: "bold" }}>
               Accessibility Analysis Results
             </Typography>
             {analyzedUrl && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                <strong>Analyzed URL:</strong>{' '}
-                <a href={analyzedUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                <strong>Analyzed URL:</strong>{" "}
+                <a
+                  href={analyzedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ wordBreak: "break-all" }}
+                >
                   {analyzedUrl}
                 </a>
               </Typography>
             )}
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
           <Button
             variant="outlined"
             startIcon={<Download />}
@@ -199,11 +235,7 @@ const ResultsPage = () => {
         </Box>
 
         {/* Results Content */}
-        <ResultsContent
-          activeTab={activeTab}
-          result={result}
-          theme={theme}
-        />
+        <ResultsContent activeTab={activeTab} result={result} theme={theme} />
       </Box>
 
       {/* Export Dialog */}

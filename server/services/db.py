@@ -43,6 +43,8 @@ async def init_indexes():
 
 async def seed_default_users(get_password_hash):
     """Seed default users if not present."""
+    if os.environ.get("SEED_DEFAULT_USERS", "true" if os.environ.get("APP_ENV", "development").lower() != "production" else "false").lower() != "true":
+        return
     existing_test = await users.find_one({"email": "test@example.com"})
     if not existing_test:
         await users.insert_one({

@@ -1,11 +1,30 @@
-import React from 'react';
-import { Box, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { ExpandMore, CheckCircleOutline, Code, SmartToy, HelpOutline, Block } from '@mui/icons-material';
+import React from "react";
+import {
+  Box,
+  Typography,
+  Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
+import {
+  ExpandMore,
+  CheckCircleOutline,
+  Code,
+  SmartToy,
+  HelpOutline,
+  Block,
+} from "@mui/icons-material";
 
 /**
  * ResultsTabContent Component
  * Renders the content for each results tab (violations, passes, incomplete, inapplicable)
- * 
+ *
  * @param {Object} props - Component props
  * @param {string} props.activeTab - Currently active tab index
  * @param {Array} props.violations - Array of violation objects
@@ -20,25 +39,32 @@ import { ExpandMore, CheckCircleOutline, Code, SmartToy, HelpOutline, Block } fr
  * @param {Function} props.renderViolationItem - Function to render individual violation items
  * @returns {JSX.Element} The tab content component
  */
-const ResultsTabContent = ({ 
-  activeTab, 
-  violations, 
-  passes, 
-  incomplete, 
-  inapplicable, 
-  theme, 
-  severityMap,
+const ResultsTabContent = ({
+  activeTab,
+  violations,
+  passes,
+  incomplete,
+  inapplicable,
+  theme,
   onNeedsReview,
   needsReviewLoading,
   needsReviewResponse,
-  renderViolationItem
+  renderViolationItem,
 }) => {
   // Render Violations Tab
   const renderViolations = () => {
     if (violations.length === 0) {
       return (
-        <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: theme.palette.success.light + '20' }}>
-          <CheckCircleOutline sx={{ fontSize: 48, color: theme.palette.success.main, mb: 2 }} />
+        <Paper
+          sx={{
+            p: 4,
+            textAlign: "center",
+            backgroundColor: theme.palette.success.light + "20",
+          }}
+        >
+          <CheckCircleOutline
+            sx={{ fontSize: 48, color: theme.palette.success.main, mb: 2 }}
+          />
           <Typography variant="h6" color="success.main" gutterBottom>
             No Accessibility Violations Found!
           </Typography>
@@ -63,7 +89,7 @@ const ResultsTabContent = ({
   const renderPasses = () => {
     if (passes.length === 0) {
       return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Paper sx={{ p: 4, textAlign: "center" }}>
           <Typography variant="h6" gutterBottom>
             No Passed Tests
           </Typography>
@@ -80,44 +106,61 @@ const ResultsTabContent = ({
           Passed Accessibility Tests ({passes.length})
         </Typography>
         {passes.map((issue, index) => (
-          <Accordion 
+          <Accordion
             key={index}
-            sx={{ 
+            sx={{
               mb: 2,
-              '&:before': { display: 'none' },
+              "&:before": { display: "none" },
               boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.success.light}`
+              border: `1px solid ${theme.palette.success.light}`,
             }}
           >
-            <AccordionSummary 
+            <AccordionSummary
               expandIcon={<ExpandMore />}
-              sx={{ 
-                backgroundColor: theme.palette.success.light + '10',
-                '&:hover': { backgroundColor: theme.palette.success.light + '20' }
+              sx={{
+                backgroundColor: theme.palette.success.light + "10",
+                "&:hover": {
+                  backgroundColor: theme.palette.success.light + "20",
+                },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
                 <CheckCircleOutline color="success" />
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
+                  <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
+                    {issue.id || "Unknown Rule"}
                   </Typography>
-                  <Chip 
-                    label="Passed" 
-                    color="success" 
-                    size="small" 
+                  <Chip
+                    label="Passed"
+                    color="success"
+                    size="small"
                     sx={{ mt: 0.5 }}
                   />
                 </Box>
               </Box>
             </AccordionSummary>
-            
+
             <AccordionDetails>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This accessibility test passed successfully.'}
+                {issue.help ||
+                  issue.description ||
+                  "This accessibility test passed successfully."}
               </Typography>
               {issue.helpUrl && (
-                <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
+                <Typography
+                  variant="body2"
+                  color="primary"
+                  component="a"
+                  href={issue.helpUrl}
+                  target="_blank"
+                >
                   Learn more about this rule
                 </Typography>
               )}
@@ -132,7 +175,7 @@ const ResultsTabContent = ({
   const renderIncomplete = () => {
     if (incomplete.length === 0) {
       return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Paper sx={{ p: 4, textAlign: "center" }}>
           <Typography variant="h6" gutterBottom>
             No Incomplete Tests
           </Typography>
@@ -149,36 +192,46 @@ const ResultsTabContent = ({
           Incomplete Tests ({incomplete.length})
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          These tests could not be completed automatically and may require manual review.
+          These tests could not be completed automatically and may require
+          manual review.
         </Typography>
-        
+
         {incomplete.map((issue, index) => (
-          <Accordion 
+          <Accordion
             key={index}
-            sx={{ 
+            sx={{
               mb: 2,
-              '&:before': { display: 'none' },
+              "&:before": { display: "none" },
               boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.warning.light}`
+              border: `1px solid ${theme.palette.warning.light}`,
             }}
           >
-            <AccordionSummary 
+            <AccordionSummary
               expandIcon={<ExpandMore />}
-              sx={{ 
-                backgroundColor: theme.palette.warning.light + '10',
-                '&:hover': { backgroundColor: theme.palette.warning.light + '20' }
+              sx={{
+                backgroundColor: theme.palette.warning.light + "10",
+                "&:hover": {
+                  backgroundColor: theme.palette.warning.light + "20",
+                },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
                 <HelpOutline color="warning" />
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
+                  <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
+                    {issue.id || "Unknown Rule"}
                   </Typography>
-                  <Chip 
-                    label="Needs Review" 
-                    color="warning" 
-                    size="small" 
+                  <Chip
+                    label="Needs Review"
+                    color="warning"
+                    size="small"
                     sx={{ mt: 0.5 }}
                   />
                 </Box>
@@ -189,27 +242,31 @@ const ResultsTabContent = ({
                   }}
                   disabled={needsReviewLoading[index]}
                   style={{
-                    background: 'none',
-                    border: '1px solid currentColor',
-                    borderRadius: '4px',
-                    padding: '4px 12px',
-                    cursor: needsReviewLoading[index] ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    background: "none",
+                    border: "1px solid currentColor",
+                    borderRadius: "4px",
+                    padding: "4px 12px",
+                    cursor: needsReviewLoading[index]
+                      ? "not-allowed"
+                      : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
                   }}
                 >
                   <SmartToy fontSize="small" />
-                  {needsReviewLoading[index] ? 'Loading...' : 'Needs Review'}
+                  {needsReviewLoading[index] ? "Loading..." : "Needs Review"}
                 </button>
               </Box>
             </AccordionSummary>
-            
+
             <AccordionDetails>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This test requires manual review.'}
+                {issue.help ||
+                  issue.description ||
+                  "This test requires manual review."}
               </Typography>
-              
+
               {issue.nodes && issue.nodes.length > 0 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -223,56 +280,90 @@ const ResultsTabContent = ({
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Typography 
-                              variant="body2" 
+                            <Typography
+                              variant="body2"
                               component="code"
-                              sx={{ 
-                                backgroundColor: theme.palette.background.default,
-                                padding: '2px 6px',
+                              sx={{
+                                backgroundColor:
+                                  theme.palette.background.default,
+                                padding: "2px 6px",
                                 borderRadius: 1,
-                                fontFamily: 'monospace',
-                                fontSize: '0.875rem'
+                                fontFamily: "monospace",
+                                fontSize: "0.875rem",
                               }}
                             >
-                              {node.html || 'No HTML available'}
+                              {node.html || "No HTML available"}
                             </Typography>
                           }
-                          secondary={node.target ? `Selector: ${node.target.join(', ')}` : null}
+                          secondary={
+                            node.target
+                              ? `Selector: ${node.target.join(", ")}`
+                              : null
+                          }
                         />
                       </ListItem>
                     ))}
                   </List>
                 </Box>
               )}
-               
-               {/* AI Response Display */}
-               {needsReviewResponse[index] && (
-                 <Box sx={{ mt: 3, p: 2, backgroundColor: theme.palette.background.default, borderRadius: 1 }}>
-                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: theme.palette.primary.main }}>
-                     🤖 AI Suggestion
-                   </Typography>
-                   <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
-                     {needsReviewResponse[index].explanation}
-                   </Typography>
-                   {needsReviewResponse[index].fix && (
-                     <Box>
-                       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                         💡 How to Fix
-                       </Typography>
-                       <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                         {needsReviewResponse[index].fix}
-                       </Typography>
-                     </Box>
-                   )}
-                 </Box>
-               )}
-               
-               {issue.helpUrl && (
-                 <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                   Learn more about this rule
-                 </Typography>
-               )}
-             </AccordionDetails>
+
+              {/* AI Response Display */}
+              {needsReviewResponse[index] && (
+                <Box
+                  sx={{
+                    mt: 3,
+                    p: 2,
+                    backgroundColor: theme.palette.background.default,
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      mb: 1,
+                      fontWeight: "bold",
+                      color: theme.palette.primary.main,
+                    }}
+                  >
+                    🤖 AI Suggestion
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 2, whiteSpace: "pre-line" }}
+                  >
+                    {needsReviewResponse[index].explanation}
+                  </Typography>
+                  {needsReviewResponse[index].fix && (
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ mb: 1, fontWeight: "bold" }}
+                      >
+                        💡 How to Fix
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ whiteSpace: "pre-line" }}
+                      >
+                        {needsReviewResponse[index].fix}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {issue.helpUrl && (
+                <Typography
+                  variant="body2"
+                  color="primary"
+                  component="a"
+                  href={issue.helpUrl}
+                  target="_blank"
+                >
+                  Learn more about this rule
+                </Typography>
+              )}
+            </AccordionDetails>
           </Accordion>
         ))}
       </Box>
@@ -283,7 +374,7 @@ const ResultsTabContent = ({
   const renderInapplicable = () => {
     if (inapplicable.length === 0) {
       return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Paper sx={{ p: 4, textAlign: "center" }}>
           <Typography variant="h6" gutterBottom>
             No Inapplicable Tests
           </Typography>
@@ -302,46 +393,61 @@ const ResultsTabContent = ({
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           These tests were not applicable to the content on this page.
         </Typography>
-        
+
         {inapplicable.map((issue, index) => (
-          <Accordion 
+          <Accordion
             key={index}
-            sx={{ 
+            sx={{
               mb: 2,
-              '&:before': { display: 'none' },
+              "&:before": { display: "none" },
               boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.divider}`
+              border: `1px solid ${theme.palette.divider}`,
             }}
           >
-            <AccordionSummary 
+            <AccordionSummary
               expandIcon={<ExpandMore />}
-              sx={{ 
+              sx={{
                 backgroundColor: theme.palette.action.hover,
-                '&:hover': { backgroundColor: theme.palette.action.selected }
+                "&:hover": { backgroundColor: theme.palette.action.selected },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
                 <Block color="disabled" />
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
+                  <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
+                    {issue.id || "Unknown Rule"}
                   </Typography>
-                  <Chip 
-                    label="Not Applicable" 
-                    color="default" 
-                    size="small" 
+                  <Chip
+                    label="Not Applicable"
+                    color="default"
+                    size="small"
                     sx={{ mt: 0.5 }}
                   />
                 </Box>
               </Box>
             </AccordionSummary>
-            
+
             <AccordionDetails>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This test was not applicable to the page content.'}
+                {issue.help ||
+                  issue.description ||
+                  "This test was not applicable to the page content."}
               </Typography>
               {issue.helpUrl && (
-                <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
+                <Typography
+                  variant="body2"
+                  color="primary"
+                  component="a"
+                  href={issue.helpUrl}
+                  target="_blank"
+                >
                   Learn more about this rule
                 </Typography>
               )}

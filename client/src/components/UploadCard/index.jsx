@@ -1,13 +1,15 @@
 // src/components/UploadCard/index.jsx
-import React, { useState } from 'react';
-import {Box, Paper, Tab, Tabs} from '@mui/material';
-import {CloudUpload, Code, ContentPaste} from '@mui/icons-material';
+import React, { useState } from "react";
+import { Box, Paper, Tab, Tabs } from "@mui/material";
+import CloudUpload from "@mui/icons-material/CloudUpload";
+import Code from "@mui/icons-material/Code";
+import ContentPaste from "@mui/icons-material/ContentPaste";
 
 // Import tab components
-import URLTab from './URLTab';
-import FileUploadTab from './FileUploadTab';
-import HTMLCodeTab from './HTMLCodeTab';
-import { useTheme } from '@mui/material/styles';
+import URLTab from "./URLTab";
+import FileUploadTab from "./FileUploadTab";
+import HTMLCodeTab from "./HTMLCodeTab";
+import { useTheme } from "@mui/material/styles";
 
 /**
  * Custom TabPanel component for the upload/paste tabs
@@ -25,11 +27,7 @@ function TabPanel(props) {
       aria-labelledby={`upload-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   );
 }
@@ -40,7 +38,7 @@ function TabPanel(props) {
  * - URL input
  * - File upload
  * - Direct HTML code input
- * 
+ *
  * @param {Object} props - Component props
  * @param {Function} props.onAnalyze - Callback function to handle HTML analysis
  * @param {number} [props.defaultTab=0] - Default tab index to show (0: URL, 1: Upload, 2: HTML)
@@ -50,19 +48,19 @@ function TabPanel(props) {
  * @param {Function} [props.clearError] - Function to clear errors
  * @returns {JSX.Element} The upload card component
  */
-const UploadCard = ({ 
-  onAnalyze, 
-  defaultTab = 0, 
-  isLoading = false, 
+const UploadCard = ({
+  onAnalyze,
+  defaultTab = 0,
+  isLoading = false,
   setIsLoading = () => {},
   onError = () => {},
-  clearError = () => {}
+  clearError = () => {},
 }) => {
   // State management
   const [tabValue, setTabValue] = useState(defaultTab);
   // Get theme inside component to ensure it updates with theme changes
   const theme = useTheme();
-  
+
   // Define colors using current theme
   const COLORS = {
     primary: theme.palette.primary.main,
@@ -71,7 +69,7 @@ const UploadCard = ({
     background: theme.palette.background.paper,
     border: theme.palette.divider,
     text: theme.palette.text.primary,
-    lightText: theme.palette.text.secondary
+    lightText: theme.palette.text.secondary,
   };
 
   /**
@@ -85,69 +83,69 @@ const UploadCard = ({
   };
 
   return (
-    <Paper 
-      elevation={2} 
-      sx={{ 
-        width: '100%', 
+    <Paper
+      elevation={2}
+      sx={{
+        width: "100%",
         borderRadius: 2,
-        overflow: 'hidden',
+        overflow: "hidden",
         bgcolor: COLORS.background,
-        maxWidth: '800px',
-        mx: 'auto',
-        border: `1px solid ${COLORS.border}`
+        maxWidth: "800px",
+        mx: "auto",
+        border: `1px solid ${COLORS.border}`,
       }}
     >
       {/* Tabs Navigation */}
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange} 
+      <Tabs
+        value={tabValue}
+        onChange={handleTabChange}
         variant="fullWidth"
         aria-label="Accessibility analysis input methods"
-        sx={{ 
-          borderBottom: 1, 
+        sx={{
+          borderBottom: 1,
           borderColor: COLORS.border,
-          '& .MuiTabs-indicator': {
+          "& .MuiTabs-indicator": {
             backgroundColor: COLORS.primary,
-            height: 3
-          }
+            height: 3,
+          },
         }}
       >
-        <Tab 
+        <Tab
           icon={<ContentPaste />}
-          label="URL" 
+          label="URL"
           aria-label="Enter URL for accessibility analysis"
-          sx={{ 
+          sx={{
             color: tabValue === 0 ? COLORS.primary : COLORS.lightText,
-            '&.Mui-selected': { color: COLORS.primary }
+            "&.Mui-selected": { color: COLORS.primary },
           }}
         />
-        <Tab 
-          icon={<CloudUpload />} 
-          label="Upload File" 
+        <Tab
+          icon={<CloudUpload />}
+          label="Upload File"
           aria-label="Upload HTML file for accessibility analysis"
-          sx={{ 
+          sx={{
             color: tabValue === 1 ? COLORS.primary : COLORS.lightText,
-            '&.Mui-selected': { color: COLORS.primary }
+            "&.Mui-selected": { color: COLORS.primary },
           }}
         />
-        <Tab 
-          icon={<Code />} 
-          label="HTML Code" 
+        <Tab
+          icon={<Code />}
+          label="HTML Code"
           aria-label="Paste HTML code for accessibility analysis"
-          sx={{ 
+          sx={{
             color: tabValue === 2 ? COLORS.primary : COLORS.lightText,
-            '&.Mui-selected': { color: COLORS.primary }
+            "&.Mui-selected": { color: COLORS.primary },
           }}
         />
       </Tabs>
 
       {/* URL Tab */}
       <TabPanel value={tabValue} index={0}>
-        <URLTab 
-          onAnalyze={onAnalyze} 
-          setIsLoading={setIsLoading} 
-          isLoading={isLoading} 
-          colors={COLORS} 
+        <URLTab
+          onAnalyze={onAnalyze}
+          setIsLoading={setIsLoading}
+          isLoading={isLoading}
+          colors={COLORS}
           onError={onError}
           clearError={clearError}
         />
@@ -155,11 +153,11 @@ const UploadCard = ({
 
       {/* File Upload Tab */}
       <TabPanel value={tabValue} index={1}>
-        <FileUploadTab 
-          onAnalyze={onAnalyze} 
-          setIsLoading={setIsLoading} 
-          isLoading={isLoading} 
-          colors={COLORS} 
+        <FileUploadTab
+          onAnalyze={onAnalyze}
+          setIsLoading={setIsLoading}
+          isLoading={isLoading}
+          colors={COLORS}
           onError={onError}
           clearError={clearError}
         />
@@ -167,11 +165,11 @@ const UploadCard = ({
 
       {/* HTML Code Tab */}
       <TabPanel value={tabValue} index={2}>
-        <HTMLCodeTab 
-          onAnalyze={onAnalyze} 
-          setIsLoading={setIsLoading} 
-          isLoading={isLoading} 
-          colors={COLORS} 
+        <HTMLCodeTab
+          onAnalyze={onAnalyze}
+          setIsLoading={setIsLoading}
+          isLoading={isLoading}
+          colors={COLORS}
           onError={onError}
           clearError={clearError}
         />

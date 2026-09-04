@@ -49,7 +49,9 @@ def initialize_gemini():
 def record_ai_metric(metric_name: str, value: float) -> None:
     """Record AI performance metric."""
     global AI_METRICS
-    if metric_name == "response_time":
+    if metric_name == "request_started":
+        AI_METRICS["total_requests"] += 1
+    elif metric_name == "response_time":
         AI_METRICS["response_times"].append(value)
         AI_METRICS["average_response_time_ms"] = sum(AI_METRICS["response_times"]) / len(AI_METRICS["response_times"])
     elif metric_name == "successful_request":
@@ -58,7 +60,6 @@ def record_ai_metric(metric_name: str, value: float) -> None:
         AI_METRICS["failed_requests"] += 1
     elif metric_name == "cached_response":
         AI_METRICS["cached_responses"] += 1
-    AI_METRICS["total_requests"] += 1
 
 def get_ai_metrics() -> Dict[str, Any]:
     """Get current AI performance metrics."""
@@ -79,7 +80,7 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
         Dict containing the response or error information
     """
     start_time = datetime.utcnow()
-    record_ai_metric("total_requests", 1)
+    record_ai_metric("request_started", 1)
     
     # Filter user query for safety and topic compliance
     user_messages = [m for m in messages if m.get("role") == "user"]

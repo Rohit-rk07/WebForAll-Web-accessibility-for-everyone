@@ -15,3 +15,19 @@ services:
         value: "1"
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /ms-playwright
+      - key: APP_ENV
+        value: production
+      - key: ALLOW_DEMO_LOGIN
+        value: "false"
+      - key: SEED_DEFAULT_USERS
+        value: "false"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

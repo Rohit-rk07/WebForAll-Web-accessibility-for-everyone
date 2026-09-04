@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
-import { 
-  Typography, 
-  Box, 
-  Paper, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Typography,
+  Box,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
   IconButton,
   Chip,
@@ -19,28 +19,30 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  CircularProgress
-} from '@mui/material';
-import { 
-  Delete, 
-  Edit, 
-  Visibility, 
-  Search, 
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import {
+  Delete,
+  Edit,
+  Visibility,
+  Search,
   SortByAlpha,
   CalendarMonth,
-  FilterList
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { useTheme } from '@mui/material/styles';
-import { apiDelete, apiJson } from '../services/apiClient';
+  FilterList,
+} from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
+import { apiDelete, apiJson } from "../services/apiClient";
 
 const History = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState("date");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [loadError, setLoadError] = useState("");
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
@@ -51,26 +53,29 @@ const History = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await apiJson('/history?limit=100');
+        const data = await apiJson("/history?limit=100");
         const items = Array.isArray(data.items) ? data.items : [];
         const mapped = items.map((it, idx) => ({
           id: it.id || String(idx),
-          url: it.input_ref || '',
-          name: it.input_type === 'url'
-            ? (() => {
-                try {
-                  return new URL(it.input_ref || '').hostname;
-                } catch {
-                  return it.input_ref || 'Unknown URL';
-                }
-              })()
-            : (it.input_type || 'analysis'),
+          url: it.input_ref || "",
+          name:
+            it.input_type === "url"
+              ? (() => {
+                  try {
+                    return new URL(it.input_ref || "").hostname;
+                  } catch {
+                    return it.input_ref || "Unknown URL";
+                  }
+                })()
+              : it.input_type || "analysis",
           date: it.created_at || null,
-          violations_count: typeof it.violations_count === 'number' ? it.violations_count : 0,
+          violations_count:
+            typeof it.violations_count === "number" ? it.violations_count : 0,
         }));
         setReports(mapped);
       } catch (e) {
         console.error(e);
+        setLoadError(e.message || "Unable to load analysis history.");
       } finally {
         setLoading(false);
       }
@@ -79,33 +84,34 @@ const History = () => {
   }, []);
 
   // Filter reports based on search term
-  const filteredReports = reports.filter(report => 
-    (report.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (report.url || '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredReports = reports.filter(
+    (report) =>
+      (report.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (report.url || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Sort reports based on sort field and direction
   const sortedReports = [...filteredReports].sort((a, b) => {
     let comparison = 0;
-    
-    if (sortField === 'name') {
+
+    if (sortField === "name") {
       comparison = a.name.localeCompare(b.name);
-    } else if (sortField === 'violations') {
+    } else if (sortField === "violations") {
       comparison = (a.violations_count || 0) - (b.violations_count || 0);
-    } else if (sortField === 'date') {
+    } else if (sortField === "date") {
       comparison = new Date(a.date || 0) - new Date(b.date || 0);
     }
-    
-    return sortDirection === 'asc' ? comparison : -comparison;
+
+    return sortDirection === "asc" ? comparison : -comparison;
   });
 
   // Handle sort toggle
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
@@ -124,9 +130,11 @@ const History = () => {
   // Save edited report name
   const handleSaveEdit = () => {
     if (currentReport) {
-      setReports(reports.map(report => 
-        report.id === currentReport.id ? currentReport : report
-      ));
+      setReports(
+        reports.map((report) =>
+          report.id === currentReport.id ? currentReport : report,
+        ),
+      );
       setEditDialogOpen(false);
     }
   };
@@ -142,7 +150,7 @@ const History = () => {
     if (!currentReport) return;
     try {
       await apiDelete(`/history/${currentReport.id}`);
-      const updated = reports.filter(r => r.id !== currentReport.id);
+      const updated = reports.filter((r) => r.id !== currentReport.id);
       setReports(updated);
       setDeleteDialogOpen(false);
     } catch (e) {
@@ -151,9 +159,17 @@ const History = () => {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
       {/* Header Section */}
-      <Paper elevation={1} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+      <Paper
+        elevation={1}
+        sx={{
+          p: 3,
+          mb: 3,
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          color: "white",
+        }}
+      >
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Analysis History
         </Typography>
@@ -161,9 +177,16 @@ const History = () => {
           Track your accessibility testing progress and revisit previous reports
         </Typography>
       </Paper>
-      
+
       {/* Search and Filter Section */}
-      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
+        }}
+      >
         <TextField
           placeholder="Search websites..."
           value={searchTerm}
@@ -179,51 +202,75 @@ const History = () => {
             ),
           }}
         />
-        
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button 
-            variant={sortField === 'name' ? 'contained' : 'outlined'}
+
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant={sortField === "name" ? "contained" : "outlined"}
             startIcon={<SortByAlpha />}
-            onClick={() => handleSort('name')}
+            onClick={() => handleSort("name")}
             size="small"
           >
-            Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+            Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
-          
-          <Button 
-            variant={sortField === 'date' ? 'contained' : 'outlined'}
+
+          <Button
+            variant={sortField === "date" ? "contained" : "outlined"}
             startIcon={<CalendarMonth />}
-            onClick={() => handleSort('date')}
+            onClick={() => handleSort("date")}
             size="small"
           >
-            Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+            Date {sortField === "date" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
-          
-          <Button 
-            variant={sortField === 'violations' ? 'contained' : 'outlined'}
+
+          <Button
+            variant={sortField === "violations" ? "contained" : "outlined"}
             startIcon={<FilterList />}
-            onClick={() => handleSort('violations')}
+            onClick={() => handleSort("violations")}
             size="small"
           >
-            Violations {sortField === 'violations' && (sortDirection === 'asc' ? '↑' : '↓')}
+            Violations{" "}
+            {sortField === "violations" &&
+              (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
         </Box>
       </Box>
-      
+
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
           <CircularProgress />
         </Box>
+      ) : loadError ? (
+        <Alert severity="error">{loadError}</Alert>
       ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 2 }}>
+        <TableContainer
+          component={Paper}
+          sx={{ borderRadius: 2, boxShadow: 2 }}
+        >
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'primary.50' }}>
-                <TableCell><Typography fontWeight="bold">Website</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">URL / Input</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">Date</Typography></TableCell>
-                <TableCell><Typography fontWeight="bold">Violations</Typography></TableCell>
-                <TableCell align="right"><Typography fontWeight="bold">Actions</Typography></TableCell>
+              <TableRow
+                sx={{
+                  bgcolor:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.05)"
+                      : "primary.50",
+                }}
+              >
+                <TableCell>
+                  <Typography fontWeight="bold">Website</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography fontWeight="bold">URL / Input</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography fontWeight="bold">Date</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography fontWeight="bold">Violations</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontWeight="bold">Actions</Typography>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -232,35 +279,49 @@ const History = () => {
                   return (
                     <TableRow key={report.id} hover>
                       <TableCell>
-                        <Typography fontWeight="medium">{report.name}</Typography>
+                        <Typography fontWeight="medium">
+                          {report.name}
+                        </Typography>
                       </TableCell>
                       <TableCell>{report.url}</TableCell>
-                      <TableCell>{report.date ? new Date(report.date).toLocaleString() : '-'}</TableCell>
                       <TableCell>
-                        <Chip 
+                        {report.date
+                          ? new Date(report.date).toLocaleString()
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
                           label={`${report.violations_count ?? 0}`}
-                          color={(report.violations_count ?? 0) === 0 ? 'success' : (report.violations_count < 10 ? 'warning' : 'error')}
+                          color={
+                            (report.violations_count ?? 0) === 0
+                              ? "success"
+                              : report.violations_count < 10
+                                ? "warning"
+                                : "error"
+                          }
                           size="small"
                         />
                       </TableCell>
                       <TableCell align="right">
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                          <IconButton 
-                            size="small" 
+                        <Box
+                          sx={{ display: "flex", justifyContent: "flex-end" }}
+                        >
+                          <IconButton
+                            size="small"
                             color="primary"
                             onClick={() => handleViewReport(report)}
                           >
                             <Visibility fontSize="small" />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color="primary"
                             onClick={() => handleEditClick(report)}
                           >
                             <Edit fontSize="small" />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color="error"
                             onClick={() => handleDeleteClick(report)}
                           >
@@ -275,7 +336,9 @@ const History = () => {
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                     <Typography variant="body1" color="text.secondary">
-                      {searchTerm ? 'No matching reports found' : 'No reports available'}
+                      {searchTerm
+                        ? "No matching reports found"
+                        : "No reports available"}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -284,7 +347,7 @@ const History = () => {
           </Table>
         </TableContainer>
       )}
-      
+
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
         <DialogTitle>Edit Website Name</DialogTitle>
@@ -295,31 +358,45 @@ const History = () => {
             label="Website Name"
             fullWidth
             variant="outlined"
-            value={currentReport?.name || ''}
-            onChange={(e) => setCurrentReport({ ...currentReport, name: e.target.value })}
+            value={currentReport?.name || ""}
+            onChange={(e) =>
+              setCurrentReport({ ...currentReport, name: e.target.value })
+            }
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveEdit} variant="contained">Save</Button>
+          <Button onClick={handleSaveEdit} variant="contained">
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete the report for "{currentReport?.name}"? This action cannot be undone.
+            Are you sure you want to delete the report for "
+            {currentReport?.name}"? This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error">Delete</Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
 
-export default History; 
+export default History;
