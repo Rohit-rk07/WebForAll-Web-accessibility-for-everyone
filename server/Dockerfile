@@ -21,9 +21,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code (exclude files via .dockerignore)
 COPY . .
 
-# Create a non-root user for security (optional, can be enabled if needed)
-# RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-# USER appuser
+# Run the application without root privileges.
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
 # Expose port
 EXPOSE 8000

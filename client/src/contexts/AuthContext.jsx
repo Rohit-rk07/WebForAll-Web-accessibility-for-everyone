@@ -1,11 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiForm, apiJson } from '../services/apiClient';
+import { AuthContext } from './AuthContextDefinition';
 
 // Create context
-const AuthContext = createContext(null);
-
-// Hook to access auth context
-export const useAuth = () => useContext(AuthContext);
 
 const AuthProviderInner = ({ children }) => {
   const [user, setUser] = useState(null);

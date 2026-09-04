@@ -1,7 +1,7 @@
 import React from 'react';
 import { Menu, MenuItem, Typography, ListItemIcon, Divider, Switch, Box, useTheme } from '@mui/material';
 import { DarkMode, LightMode, Logout } from '@mui/icons-material';
-import { useThemeMode } from '../../contexts/ThemeContext';
+import { useThemeMode } from '../../contexts/useThemeMode';
 
 /**
  * UserMenu component for user dropdown menu

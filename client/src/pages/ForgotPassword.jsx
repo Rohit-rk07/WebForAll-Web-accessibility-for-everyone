@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Box, Typography, TextField, Button, Alert, Paper } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 export default function ForgotPassword() {
   const { forgotPassword } = useAuth();

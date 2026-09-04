@@ -24,7 +24,7 @@ import {
   Person
 } from '@mui/icons-material';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 /**
  * Signup page component

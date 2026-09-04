@@ -2,8 +2,10 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
-import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useThemeMode } from './contexts/useThemeMode';
+import { useAuth } from './contexts/useAuth';
 import ErrorBoundary from './components/ErrorBoundary';
 const AiChatbot = lazy(() => import(/* webpackChunkName: "ai-chatbot" */ './components/AiChatbot'));
 

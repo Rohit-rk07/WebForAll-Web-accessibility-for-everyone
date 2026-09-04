@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Container, Box, Typography, TextField, Button, Alert, Paper, InputAdornment, IconButton } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 export default function ResetPassword() {
   const navigate = useNavigate();

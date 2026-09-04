@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import { Box, Container, useTheme } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { useNavigate } from 'react-router-dom';
 import HeroSection from '../components/Home/HeroSection';
 import FeatureCard from '../components/Home/FeatureCard';

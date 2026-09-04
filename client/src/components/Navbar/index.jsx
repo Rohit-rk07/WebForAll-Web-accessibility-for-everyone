@@ -16,7 +16,7 @@ import {
   AccountCircle
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 
 // Import components
 import NavDrawer from './NavDrawer';
