@@ -1,30 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  Button,
-  Paper
-} from '@mui/material';
-import {
-  ExpandMore,
-  CheckCircleOutline,
-  HelpOutline,
-  Block,
-  Code,
-  SmartToy,
-  WarningAmber,
-  ErrorOutline,
-  InfoOutlined
-} from '@mui/icons-material';
+import { ErrorOutline, WarningAmber, InfoOutlined, CheckCircleOutline } from '@mui/icons-material';
 import ViolationItem from './ViolationItem';
+import ResultsTabContent from './ResultsTabContent';
 import { extractAxeResults, getSeverityConfig } from '../../utils/resultsUtils';
 import aiService from '../../services/aiService';
 
@@ -76,343 +53,35 @@ const ResultsContent = ({
   }, []);
 
   /**
-   * Render Violations Tab
+   * Render individual violation item
    */
-  const renderViolations = () => {
-    if (violations.length === 0) {
-      return (
-        <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: theme.palette.success.light + '20' }}>
-          <CheckCircleOutline sx={{ fontSize: 48, color: theme.palette.success.main, mb: 2 }} />
-          <Typography variant="h6" color="success.main" gutterBottom>
-            No Accessibility Violations Found!
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Great job! Your page meets the selected accessibility standards.
-          </Typography>
-        </Paper>
-      );
-    }
-
+  const renderViolationItem = (issue, index) => {
     return (
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-          Accessibility Violations ({violations.length})
-        </Typography>
-        {violations.map((issue, index) => (
-          <ViolationItem
-            key={index}
-            issue={issue}
-            index={index}
-            severityMap={severityMap}
-            theme={theme}
-          />
-        ))}
-      </Box>
+      <ViolationItem
+        key={index}
+        issue={issue}
+        index={index}
+        severityMap={severityMap}
+        theme={theme}
+      />
     );
   };
 
-  /**
-   * Render Passes Tab
-   */
-  const renderPasses = () => {
-    if (passes.length === 0) {
-      return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            No Passed Tests
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No accessibility tests were passed.
-          </Typography>
-        </Paper>
-      );
-    }
-
-    return (
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-          Passed Accessibility Tests ({passes.length})
-        </Typography>
-        {passes.map((issue, index) => (
-          <Accordion 
-            key={index}
-            sx={{ 
-              mb: 2,
-              '&:before': { display: 'none' },
-              boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.success.light}`
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMore />}
-              sx={{ 
-                backgroundColor: theme.palette.success.light + '10',
-                '&:hover': { backgroundColor: theme.palette.success.light + '20' }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                <CheckCircleOutline color="success" />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
-                  </Typography>
-                  <Chip 
-                    label="Passed" 
-                    color="success" 
-                    size="small" 
-                    sx={{ mt: 0.5 }}
-                  />
-                </Box>
-              </Box>
-            </AccordionSummary>
-            
-            <AccordionDetails>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This accessibility test passed successfully.'}
-              </Typography>
-              {issue.helpUrl && (
-                <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                  Learn more about this rule
-                </Typography>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        ))}
-      </Box>
-    );
-  };
-
-  /**
-   * Render Incomplete Tab
-   */
-  const renderIncomplete = () => {
-    if (incomplete.length === 0) {
-      return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            No Incomplete Tests
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            All applicable tests were completed successfully.
-          </Typography>
-        </Paper>
-      );
-    }
-
-    return (
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-          Incomplete Tests ({incomplete.length})
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          These tests could not be completed automatically and may require manual review.
-        </Typography>
-        
-        {incomplete.map((issue, index) => (
-          <Accordion 
-            key={index}
-            sx={{ 
-              mb: 2,
-              '&:before': { display: 'none' },
-              boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.warning.light}`
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMore />}
-              sx={{ 
-                backgroundColor: theme.palette.warning.light + '10',
-                '&:hover': { backgroundColor: theme.palette.warning.light + '20' }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                <HelpOutline color="warning" />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
-                  </Typography>
-                  <Chip 
-                    label="Needs Review" 
-                    color="warning" 
-                    size="small" 
-                    sx={{ mt: 0.5 }}
-                  />
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<SmartToy />}
-                  onClick={() => handleNeedsReview(issue, index)}
-                  disabled={needsReviewLoading[index]}
-                  sx={{ mr: 1 }}
-                >
-                  {needsReviewLoading[index] ? 'Loading...' : 'Needs Review'}
-                </Button>
-              </Box>
-            </AccordionSummary>
-            
-            <AccordionDetails>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This test requires manual review.'}
-              </Typography>
-              
-              {issue.nodes && issue.nodes.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Elements to Review ({issue.nodes.length})
-                  </Typography>
-                  <List dense>
-                    {issue.nodes.slice(0, 3).map((node, nodeIndex) => (
-                      <ListItem key={nodeIndex} sx={{ pl: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <Code fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Typography 
-                              variant="body2" 
-                              component="code"
-                              sx={{ 
-                                backgroundColor: theme.palette.background.default,
-                                padding: '2px 6px',
-                                borderRadius: 1,
-                                fontFamily: 'monospace',
-                                fontSize: '0.875rem'
-                              }}
-                            >
-                              {node.html || 'No HTML available'}
-                            </Typography>
-                          }
-                          secondary={node.target ? `Selector: ${node.target.join(', ')}` : null}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-               
-               {/* AI Response Display */}
-               {needsReviewResponse[index] && (
-                 <Box sx={{ mt: 3, p: 2, backgroundColor: theme.palette.background.default, borderRadius: 1 }}>
-                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: theme.palette.primary.main }}>
-                     🤖 AI Suggestion
-                   </Typography>
-                   <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
-                     {needsReviewResponse[index].explanation}
-                   </Typography>
-                   {needsReviewResponse[index].fix && (
-                     <Box>
-                       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                         💡 How to Fix
-                       </Typography>
-                       <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                         {needsReviewResponse[index].fix}
-                       </Typography>
-                     </Box>
-                   )}
-                 </Box>
-               )}
-               
-               {issue.helpUrl && (
-                 <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                   Learn more about this rule
-                 </Typography>
-               )}
-             </AccordionDetails>
-          </Accordion>
-        ))}
-      </Box>
-    );
-  };
-
-  /**
-   * Render Inapplicable Tab
-   */
-  const renderInapplicable = () => {
-    if (inapplicable.length === 0) {
-      return (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            No Inapplicable Tests
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            All tests were applicable to this page.
-          </Typography>
-        </Paper>
-      );
-    }
-
-    return (
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-          Inapplicable Tests ({inapplicable.length})
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          These tests were not applicable to the content on this page.
-        </Typography>
-        
-        {inapplicable.map((issue, index) => (
-          <Accordion 
-            key={index}
-            sx={{ 
-              mb: 2,
-              '&:before': { display: 'none' },
-              boxShadow: theme.shadows[1],
-              border: `1px solid ${theme.palette.divider}`
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMore />}
-              sx={{ 
-                backgroundColor: theme.palette.action.hover,
-                '&:hover': { backgroundColor: theme.palette.action.selected }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                <Block color="disabled" />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {issue.id || 'Unknown Rule'}
-                  </Typography>
-                  <Chip 
-                    label="Not Applicable" 
-                    color="default" 
-                    size="small" 
-                    sx={{ mt: 0.5 }}
-                  />
-                </Box>
-              </Box>
-            </AccordionSummary>
-            
-            <AccordionDetails>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {issue.help || issue.description || 'This test was not applicable to the page content.'}
-              </Typography>
-              {issue.helpUrl && (
-                <Typography variant="body2" color="primary" component="a" href={issue.helpUrl} target="_blank">
-                  Learn more about this rule
-                </Typography>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        ))}
-      </Box>
-    );
-  };
-
-  // Render content based on active tab
-  switch (activeTab) {
-    case 0:
-      return renderViolations();
-    case 1:
-      return renderPasses();
-    case 2:
-      return renderIncomplete();
-    case 3:
-      return renderInapplicable();
-    default:
-      return renderViolations();
-  }
+  return (
+    <ResultsTabContent
+      activeTab={activeTab}
+      violations={violations}
+      passes={passes}
+      incomplete={incomplete}
+      inapplicable={inapplicable}
+      theme={theme}
+      severityMap={severityMap}
+      onNeedsReview={handleNeedsReview}
+      needsReviewLoading={needsReviewLoading}
+      needsReviewResponse={needsReviewResponse}
+      renderViolationItem={renderViolationItem}
+    />
+  );
 };
 
 export default ResultsContent;

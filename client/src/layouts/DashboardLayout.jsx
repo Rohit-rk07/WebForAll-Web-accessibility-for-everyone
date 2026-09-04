@@ -40,6 +40,7 @@ const DashboardLayout = () => {
       
       {/* Main Content */}
       <Box 
+        id="main-content"
         component="main" 
         sx={{ 
           p: 3,
@@ -48,6 +49,7 @@ const DashboardLayout = () => {
           minHeight: 'calc(100vh - 64px)',
           overflow: 'auto',
         }}
+        tabIndex={-1} // Allow focus but don't show outline
       > 
         <Outlet />
       </Box>

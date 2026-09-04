@@ -12,7 +12,9 @@ from services.db import users as users_col, password_reset_tokens as prt_col, in
 from typing import Optional, Union
 
 # Authentication settings
-SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable must be set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

@@ -170,6 +170,7 @@ ${aiSuggestion.fixedCode}
       }}
     >
       <AccordionSummary 
+        component="div"
         expandIcon={<ExpandMore />}
         sx={{ 
           bgcolor: theme.palette.mode === 'dark' 

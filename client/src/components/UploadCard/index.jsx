@@ -102,6 +102,7 @@ const UploadCard = ({
         value={tabValue} 
         onChange={handleTabChange} 
         variant="fullWidth"
+        aria-label="Accessibility analysis input methods"
         sx={{ 
           borderBottom: 1, 
           borderColor: COLORS.border,
@@ -112,8 +113,9 @@ const UploadCard = ({
         }}
       >
         <Tab 
-          icon={<ContentPaste />} 
+          icon={<ContentPaste />}
           label="URL" 
+          aria-label="Enter URL for accessibility analysis"
           sx={{ 
             color: tabValue === 0 ? COLORS.primary : COLORS.lightText,
             '&.Mui-selected': { color: COLORS.primary }
@@ -122,6 +124,7 @@ const UploadCard = ({
         <Tab 
           icon={<CloudUpload />} 
           label="Upload File" 
+          aria-label="Upload HTML file for accessibility analysis"
           sx={{ 
             color: tabValue === 1 ? COLORS.primary : COLORS.lightText,
             '&.Mui-selected': { color: COLORS.primary }
@@ -130,6 +133,7 @@ const UploadCard = ({
         <Tab 
           icon={<Code />} 
           label="HTML Code" 
+          aria-label="Paste HTML code for accessibility analysis"
           sx={{ 
             color: tabValue === 2 ? COLORS.primary : COLORS.lightText,
             '&.Mui-selected': { color: COLORS.primary }

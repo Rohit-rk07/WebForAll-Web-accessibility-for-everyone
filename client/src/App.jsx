@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 const AiChatbot = lazy(() => import(/* webpackChunkName: "ai-chatbot" */ './components/AiChatbot'));
 
 // Lazy-loaded Pages with webpack chunk names for better debugging
@@ -107,36 +108,61 @@ function AppContent() {
   return (
     <MuiThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <Box sx={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
-          <BrowserRouter>
-            <Suspense fallback={<Box sx={{ p: 4 }} />}>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                {/* Dashboard Routes (Protected) */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/dashboard" element={<DashboardLayout />}>
-                    <Route index element={<Navigate to="/dashboard/home" replace />} />
-                    <Route path="home" element={<DashboardHome />} />
-                    <Route path="results/:id" element={<ResultsPage />} />
-                    <Route path="history" element={<History />} />
+      <ErrorBoundary>
+        <AuthProvider>
+          <Box sx={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
+            {/* Skip Navigation Link for Accessibility */}
+            <Box
+              component="a"
+              href="#main-content"
+              sx={{
+                position: 'absolute',
+                left: -9999,
+                top: 4,
+                zIndex: 9999,
+                padding: 2,
+                backgroundColor: 'primary.main',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: 1,
+                '&:focus': {
+                  left: 4,
+                  top: 4
+                }
+              }}
+            >
+              Skip to main content
+            </Box>
+            
+            <BrowserRouter>
+              <Suspense fallback={<Box sx={{ p: 4 }} />}>
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<Home />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  {/* Dashboard Routes (Protected) */}
+                  <Route element={<ProtectedRoute />}>
+                    <Route path="/dashboard" element={<DashboardLayout />}>
+                      <Route index element={<Navigate to="/dashboard/home" replace />} />
+                      <Route path="home" element={<DashboardHome />} />
+                      <Route path="results/:id" element={<ResultsPage />} />
+                      <Route path="history" element={<History />} />
+                    </Route>
                   </Route>
-                </Route>
-                {/* Fallback Route */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-            <Suspense fallback={null}>
-              <AiChatbot />
-            </Suspense>
-          </BrowserRouter>
-        </Box>
-      </AuthProvider>
+                  {/* Fallback Route */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+              <Suspense fallback={null}>
+                <AiChatbot />
+              </Suspense>
+            </BrowserRouter>
+          </Box>
+        </AuthProvider>
+      </ErrorBoundary>
     </MuiThemeProvider>
   );
 }

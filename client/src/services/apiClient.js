@@ -4,11 +4,36 @@ const getToken = () => localStorage.getItem('accessToken');
 
 const buildUrl = (path) => `${API_BASE_URL}${path}`;
 
-const authHeaders = (extraHeaders = {}) => {
+const authHeaders = async (extraHeaders = {}) => {
   const token = getToken();
   return {
     ...extraHeaders,
     ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
+// CSRF token management
+let csrfToken = null;
+
+const getCsrfToken = async () => {
+  if (csrfToken) return csrfToken;
+  
+  try {
+    const response = await fetch(buildUrl('/csrf-token'));
+    const data = await response.json();
+    csrfToken = data.csrf_token;
+    return csrfToken;
+  } catch (error) {
+    console.error('Failed to get CSRF token:', error);
+    return null;
+  }
+};
+
+const csrfHeaders = async (extraHeaders = {}) => {
+  const token = await getCsrfToken();
+  return {
+    ...extraHeaders,
+    ...(token ? { 'X-CSRF-Token': token } : {})
   };
 };
 
@@ -26,12 +51,18 @@ const debounce = (func, wait) => {
 };
 
 export const apiJson = async (path, options = {}) => {
+  const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes((options.method || 'POST').toUpperCase());
+  const csrfHeader = isStateChanging ? await csrfHeaders() : {};
+  const authHeaderValue = await authHeaders();
+
   const response = await fetch(buildUrl(path), {
     ...options,
-    headers: authHeaders({
+    headers: {
+      ...csrfHeader,
+      ...authHeaderValue,
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(options.headers || {})
-    })
+    }
   });
 
   let data = null;
@@ -50,10 +81,17 @@ export const apiJson = async (path, options = {}) => {
 };
 
 export const apiForm = async (path, formData, options = {}) => {
+  const csrfHeader = await csrfHeaders();
+  const authHeaderValue = await authHeaders();
+
   const response = await fetch(buildUrl(path), {
     ...options,
     method: options.method || 'POST',
-    headers: authHeaders(options.headers || {}),
+    headers: {
+      ...csrfHeader,
+      ...authHeaderValue,
+      ...(options.headers || {})
+    },
     body: formData
   });
 

@@ -75,8 +75,26 @@ const AuthProviderInner = ({ children }) => {
 
       return userData;
     } catch (err) {
-      setError(err.message);
-      throw err;
+      // Provide more specific error messages based on error type
+      let errorMessage = 'An unexpected error occurred during login';
+      
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 401) {
+          errorMessage = 'Invalid email or password';
+        } else if (status === 429) {
+          errorMessage = 'Too many login attempts. Please try again later.';
+        } else if (status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -103,8 +121,28 @@ const AuthProviderInner = ({ children }) => {
       
       return responseData;
     } catch (err) {
-      setError(err.message);
-      throw err;
+      // Provide more specific error messages for registration
+      let errorMessage = 'An unexpected error occurred during registration';
+      
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 400) {
+          errorMessage = err.response.data?.detail || 'Invalid registration data';
+        } else if (status === 409) {
+          errorMessage = 'Email already registered';
+        } else if (status === 429) {
+          errorMessage = 'Too many registration attempts. Please try again later.';
+        } else if (status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -117,8 +155,23 @@ const AuthProviderInner = ({ children }) => {
         body: JSON.stringify({ email })
       });
     } catch (err) {
-      setError(err.message);
-      throw err;
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 429) {
+          errorMessage = 'Too many requests. Please try again later.';
+        } else if (status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -134,8 +187,25 @@ const AuthProviderInner = ({ children }) => {
         })
       });
     } catch (err) {
-      setError(err.message);
-      throw err;
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 400) {
+          errorMessage = 'Invalid or expired reset token';
+        } else if (status === 429) {
+          errorMessage = 'Too many attempts. Please try again later.';
+        } else if (status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -145,15 +215,47 @@ const AuthProviderInner = ({ children }) => {
     setUser(null);
   };
 
-  // Demo login function: authenticate using seeded test account
+  // Demo login function: authenticate using server-side demo endpoint
   const demoLogin = async () => {
-    // Seeded in backend services/db.py: test@example.com / password123
     setError(null);
     try {
-      await login({ email: 'test@example.com', password: 'password123' });
+      const data = await apiJson('/demo-login', {
+        method: 'POST'
+      });
+      
+      // Store token from server response
+      localStorage.setItem('accessToken', data.access_token);
+      
+      // Set user from response
+      if (data.user) {
+        setUser(data.user);
+        return data.user;
+      }
+      
+      // Fallback: fetch user data
+      const userData = await apiJson('/users/me', {
+        headers: {
+          Authorization: `Bearer ${data.access_token}`
+        }
+      });
+      setUser(userData);
+      return userData;
     } catch (err) {
-      setError(err.message || 'Demo login failed');
-      throw err;
+      let errorMessage = 'Demo login failed. Please try again later.';
+      
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 500) {
+          errorMessage = 'Demo service temporarily unavailable. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 

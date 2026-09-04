@@ -1,6 +1,5 @@
-"""Accessibility analyzer package."""
+"""Accessibility analyzer module for Playwright-based WCAG analysis."""
 
-# Only dynamic analysis is used now - static analysis removed
-# Main analysis functions are in simple_playwright.py and playwright_helper.py
+from analyzer.simple_playwright import analyze_url
 
-__all__ = [] 
+__all__ = ['analyze_url']

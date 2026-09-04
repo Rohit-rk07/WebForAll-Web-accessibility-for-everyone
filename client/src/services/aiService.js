@@ -3,7 +3,7 @@
  * Handles API calls to the Gemini AI integration endpoints
  */
 
-import axios from 'axios';
+import { apiJson } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -14,14 +14,15 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
  */
 export const getIssueExplanation = async (issue) => {
   try {
-    const response = await axios.post(`${API_URL}/ai/explain`, {
-      issue: issue
+    const response = await apiJson('/ai/explain', {
+      method: 'POST',
+      body: JSON.stringify({ issue })
     });
     // Handle both success and error responses from backend
-    if (response.data.error) {
-      throw new Error(response.data.error);
+    if (response.error) {
+      throw new Error(response.error);
     }
-    return response.data;
+    return response;
   } catch (error) {
     console.error('Error getting AI explanation:', error);
     // Provide more specific error messages
@@ -44,14 +45,15 @@ export const getIssueExplanation = async (issue) => {
  */
 export const getResultsSummary = async (results) => {
   try {
-    const response = await axios.post(`${API_URL}/ai/summary`, {
-      results: results
+    const response = await apiJson('/ai/summary', {
+      method: 'POST',
+      body: JSON.stringify({ results })
     });
     // Handle both success and error responses from backend
-    if (response.data.error) {
-      throw new Error(response.data.error);
+    if (response.error) {
+      throw new Error(response.error);
     }
-    return response.data;
+    return response;
   } catch (error) {
     console.error('Error getting AI summary:', error);
     // Provide more specific error messages
@@ -75,17 +77,20 @@ export const getResultsSummary = async (results) => {
  */
 export const sendChatMessage = async (messages, options = {}) => {
   try {
-    const response = await axios.post(`${API_URL}/ai/chat`, {
-      messages: messages,
-      model: options.model || 'gemini-2.5-flash',
-      temperature: options.temperature || 0.7,
-      max_tokens: options.max_tokens
+    const response = await apiJson('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        messages,
+        model: options.model || 'gemini-2.5-flash',
+        temperature: options.temperature || 0.7,
+        max_tokens: options.max_tokens
+      })
     });
     // Handle both success and error responses from backend
-    if (response.data.error) {
-      throw new Error(response.data.error);
+    if (response.error) {
+      throw new Error(response.error);
     }
-    return response.data;
+    return response;
   } catch (error) {
     console.error('Error sending chat message:', error);
     // Provide more specific error messages

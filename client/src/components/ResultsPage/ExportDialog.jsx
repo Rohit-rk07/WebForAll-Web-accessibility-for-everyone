@@ -41,6 +41,20 @@ const SEVERITY_CONFIG = [
 
 const ExportDialog = ({ open, onClose, result, resultsRef }) => {
   const [loading, setLoading] = useState(false);
+  const dialogRef = React.useRef(null);
+
+  // Handle focus management when dialog opens/closes
+  React.useEffect(() => {
+    if (open && dialogRef.current) {
+      // Focus the first focusable element when dialog opens
+      const timeoutId = setTimeout(() => {
+        const firstFocusable = dialogRef.current?.querySelector('button');
+        firstFocusable?.focus();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [open]);
 
   const exportToPDF = async () => {
     if (!resultsRef.current) return;
@@ -450,21 +464,29 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      ref={dialogRef}
+      aria-labelledby="export-dialog-title"
+      aria-describedby="export-dialog-description"
+    >
+      <DialogTitle id="export-dialog-title">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Download />
+          <Download aria-hidden="true" />
           Export Results
         </Box>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent id="export-dialog-description">
         <Typography variant="body1" sx={{ mb: 2 }}>
           Export your accessibility analysis results as a PDF report.
         </Typography>
         <Typography variant="body2" color="text.secondary">
           The PDF will include:
         </Typography>
-        <Box component="ul" sx={{ mt: 1, pl: 2 }}>
+        <Box component="ul" sx={{ mt: 1, pl: 2 }} role="list">
           <Typography component="li" variant="body2">Accessibility score and summary</Typography>
           <Typography component="li" variant="body2">Detailed violation reports</Typography>
           <Typography component="li" variant="body2">Passed tests and incomplete items</Typography>
@@ -472,7 +494,11 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={loading}>
+        <Button 
+          onClick={onClose} 
+          disabled={loading}
+          aria-label="Cancel export dialog"
+        >
           Cancel
         </Button>
         <Button 
@@ -480,6 +506,7 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
           variant="contained" 
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} /> : <Download />}
+          aria-label={loading ? 'Generating PDF export' : 'Export results as PDF'}
         >
           {loading ? 'Generating PDF...' : 'Export PDF'}
         </Button>

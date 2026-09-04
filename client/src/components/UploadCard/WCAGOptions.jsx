@@ -85,6 +85,7 @@ const WCAGOptions = ({ options, onChange, colors }) => {
         }}
       >
         <AccordionSummary
+          component="div"
           expandIcon={<ExpandMore sx={{ color: colors.primary }} />}
           sx={{ 
             borderRadius: '8px',

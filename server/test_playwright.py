@@ -6,6 +6,7 @@ Test script to verify Playwright installation and functionality.
 import sys
 import logging
 import json
+import asyncio
 from pathlib import Path
 
 # Configure logging
@@ -113,7 +114,7 @@ def test_helper_script():
         
         # Test with example.com
         logger.info("Analyzing example.com...")
-        results = analyze_url("https://example.com")
+        results = asyncio.run(analyze_url("https://example.com"))
         
         if results.get("success"):
             logger.info("Helper script test successful!")

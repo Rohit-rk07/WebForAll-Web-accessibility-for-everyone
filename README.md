@@ -77,8 +77,9 @@ python setup_playwright.py
 MONGODB_URI=mongodb+srv://USERNAME:PASSWORD@cluster0.xcfdaes.mongodb.net/accessibility-analyzer?retryWrites=true&w=majority
 MONGODB_DB_NAME=accessibility-analyzer
 GEMINI_API_KEY=your_gemini_api_key
-SECRET_KEY=your_long_random_secret
+SECRET_KEY=generate_a_secure_random_string_at_least_32_characters_long
 RESET_EMAIL_COOLDOWN_MINUTES=2
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,https://your-production-domain.com
 ```
 
 8. Start the backend:

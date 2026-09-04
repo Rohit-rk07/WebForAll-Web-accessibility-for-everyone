@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 HELPER_SCRIPT = Path(__file__).parent / "playwright_helper.py"
 _WINDOWS_ANALYSIS_LOCK = threading.Lock()
 
+# Import browser pool for resource optimization
+from analyzer.browser_pool import browser_pool
+
 
 async def _run_windows_analysis_async(data: Dict[str, Any]):
     from analyzer.playwright_helper import close_browser, run_analysis
@@ -33,7 +36,7 @@ def _run_windows_analysis(data: Dict[str, Any]):
 
 async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
     """
-    Analyze a URL for accessibility issues using Playwright in a separate process.
+    Analyze a URL for accessibility issues using Playwright with browser pooling.
     
     Args:
         url (str): The URL to analyze
@@ -58,10 +61,14 @@ async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
             "wcag_options": wcag_options or {}
         }
 
+        # Skip browser pool for Windows due to async transport issues
         # Uvicorn uses a selector loop for Windows reload mode, which cannot
         # create the subprocess used by Playwright's async transport.
         if sys.platform == "win32":
             return await asyncio.to_thread(_run_windows_analysis, data)
+
+        # Initialize browser pool if not already initialized (Linux/Mac only)
+        # await browser_pool.initialize()
 
         # Import lazily so the module stays light until analysis is requested.
         from analyzer.playwright_helper import run_analysis

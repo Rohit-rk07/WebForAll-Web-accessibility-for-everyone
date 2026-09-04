@@ -1,16 +1,29 @@
-"""AI service module for Gemini API integration."""
+"""AI service module for Gemini API integration with quality metrics and safety measures."""
 
 import os
 import logging
 from typing import Dict, List, Any, Optional
 import google.generativeai as genai
 import re
+from datetime import datetime
+from services.cache_service import cache_ai_explanation, get_cached_ai_explanation
+from services.content_filter import content_filter, ContentFilterResult
 
 logger = logging.getLogger(__name__)
 
 # Gemini API Configuration
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_CONFIGURED = False
+
+# AI Quality Metrics
+AI_METRICS = {
+    "total_requests": 0,
+    "successful_requests": 0,
+    "failed_requests": 0,
+    "cached_responses": 0,
+    "average_response_time_ms": 0,
+    "response_times": []
+}
 
 def initialize_gemini():
     """Initialize Gemini AI configuration."""
@@ -33,10 +46,28 @@ def initialize_gemini():
         GEMINI_CONFIGURED = False
         return False
 
+def record_ai_metric(metric_name: str, value: float) -> None:
+    """Record AI performance metric."""
+    global AI_METRICS
+    if metric_name == "response_time":
+        AI_METRICS["response_times"].append(value)
+        AI_METRICS["average_response_time_ms"] = sum(AI_METRICS["response_times"]) / len(AI_METRICS["response_times"])
+    elif metric_name == "successful_request":
+        AI_METRICS["successful_requests"] += 1
+    elif metric_name == "failed_request":
+        AI_METRICS["failed_requests"] += 1
+    elif metric_name == "cached_response":
+        AI_METRICS["cached_responses"] += 1
+    AI_METRICS["total_requests"] += 1
+
+def get_ai_metrics() -> Dict[str, Any]:
+    """Get current AI performance metrics."""
+    return AI_METRICS.copy()
+
 def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-flash", 
                    temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
     """
-    Generate chat completion using Gemini API.
+    Generate chat completion using Gemini API with quality metrics and content filtering.
     
     Args:
         messages: List of message dictionaries with 'role' and 'content'
@@ -47,7 +78,23 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
     Returns:
         Dict containing the response or error information
     """
+    start_time = datetime.utcnow()
+    record_ai_metric("total_requests", 1)
+    
+    # Filter user query for safety and topic compliance
+    user_messages = [m for m in messages if m.get("role") == "user"]
+    if user_messages:
+        last_user_query = user_messages[-1].get("content", "")
+        filter_result = content_filter.filter_user_query(last_user_query)
+        if not filter_result.is_safe:
+            record_ai_metric("failed_request", 1)
+            return {
+                "error": filter_result.reason,
+                "content": "I can only assist with accessibility-related questions. Please ask about web accessibility, WCAG guidelines, or accessibility issues."
+            }
+    
     if not GEMINI_CONFIGURED:
+        record_ai_metric("failed_request", 1)
         return {
             "error": "Gemini AI is not configured. Please check your API key.",
             "content": "AI service is currently unavailable."
@@ -83,15 +130,34 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
             )
         )
         
+        # Filter AI response for safety
+        filter_result = content_filter.filter_ai_response(response.text, last_user_query if user_messages else "")
+        if not filter_result.is_safe:
+            record_ai_metric("failed_request", 1)
+            return {
+                "error": filter_result.reason,
+                "content": "I apologize, but I cannot provide that response. Please try asking a different accessibility-related question."
+            }
+        
+        # Record metrics
+        response_time = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to ms
+        record_ai_metric("response_time", response_time)
+        record_ai_metric("successful_request", 1)
+        
         return {
-            "content": response.text,
+            "content": filter_result.filtered_content,
             "model": model,
             "usage": {
                 "total_tokens": len(response.text.split()) if response.text else 0
+            },
+            "metrics": {
+                "response_time_ms": response_time,
+                "filter_confidence": filter_result.confidence
             }
         }
         
     except Exception as e:
+        record_ai_metric("failed_request", 1)
         logger.error(f"Gemini API error: {str(e)}")
         return {
             "error": f"Gemini API error: {str(e)}",
@@ -100,7 +166,7 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
 
 def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Generate explanation and fix for an accessibility issue.
+    Generate explanation and fix for an accessibility issue with caching and metrics.
     
     Args:
         issue: Accessibility issue data from axe-core
@@ -108,7 +174,19 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict containing fixed code and brief explanation
     """
+    start_time = datetime.utcnow()
+    record_ai_metric("total_requests", 1)
+    
+    # Check cache first
+    issue_id = issue.get('id', 'unknown')
+    cached_explanation = get_cached_ai_explanation(issue_id, issue)
+    if cached_explanation:
+        record_ai_metric("cached_response", 1)
+        logger.info(f"Returning cached explanation for issue {issue_id}")
+        return cached_explanation
+    
     if not GEMINI_CONFIGURED:
+        record_ai_metric("failed_request", 1)
         return generate_fallback_explanation(issue)
     
     try:
@@ -205,14 +283,26 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
             fixed_code = html_code
             explanation = "AI provided incomplete response. Please refer to the original code and accessibility guidelines."
         
-        return {
+        result = {
             "fixedCode": fixed_code,
             "explanation": explanation,
             "ruleId": rule_id,
-            "impact": impact
+            "impact": impact,
+            "generated_at": datetime.utcnow().isoformat()
         }
         
+        # Cache the result
+        cache_ai_explanation(issue_id, issue, result, ttl=7200)  # 2 hours
+        
+        # Record metrics
+        response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        record_ai_metric("response_time", response_time)
+        record_ai_metric("successful_request", 1)
+        
+        return result
+        
     except Exception as e:
+        record_ai_metric("failed_request", 1)
         logger.error(f"Error generating AI explanation: {str(e)}")
         return generate_fallback_explanation(issue)
 

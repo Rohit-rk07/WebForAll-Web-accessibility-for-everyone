@@ -18,13 +18,17 @@ if sys.platform == "win32":
 
 # Load environment variables from .env file
 load_dotenv()
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status, BackgroundTasks, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status, BackgroundTasks, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from itsdangerous import URLSafeTimedSerializer
 import uvicorn
 
 # Import our modular components
@@ -54,6 +58,70 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Create FastAPI app
+app = FastAPI(
+    title="Accessibility Analyzer API",
+    description="API for analyzing web accessibility and generating AI-powered explanations",
+    version="2.0"
+)
+
+# Configure rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Configure CSRF protection using signed tokens
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be set in environment variables")
+
+CSRF_SECRET = os.environ.get("CSRF_SECRET", SECRET_KEY)
+csrf_serializer = URLSafeTimedSerializer(CSRF_SECRET)
+
+def generate_csrf_token():
+    """Generate a CSRF token for state-changing operations."""
+    return csrf_serializer.dumps({"csrf": "protection"}, salt="csrf-salt")
+
+def validate_csrf_token(token: str) -> bool:
+    """Validate a CSRF token."""
+    try:
+        csrf_serializer.loads(
+            token, 
+            salt="csrf-salt", 
+            max_age=3600  # Token valid for 1 hour
+        )
+        return True
+    except Exception:
+        return False
+
+# CSRF Protection Middleware
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Middleware to protect against CSRF attacks."""
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip CSRF for GET, HEAD, OPTIONS, TRACE
+        if request.method in ["GET", "HEAD", "OPTIONS", "TRACE"]:
+            return await call_next(request)
+        
+        # Skip CSRF for authenticated endpoints (JWT provides protection)
+        if request.url.path.startswith("/token") or request.url.path.startswith("/demo-login"):
+            return await call_next(request)
+        
+        # Skip CSRF for authenticated requests with valid JWT
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            return await call_next(request)
+        
+        # For other state-changing operations, check CSRF token
+        csrf_token = request.headers.get("X-CSRF-Token")
+        if not csrf_token or not validate_csrf_token(csrf_token):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CSRF token validation failed"
+            )
+        
+        return await call_next(request)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -104,12 +172,19 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# Add CORS middleware
+# In production, restrict to specific domains only
+allowed_origins = os.environ.get(
+    "ALLOWED_ORIGINS", 
+    "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://web-for-all-web-accessibility-for-e.vercel.app"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://web-for-all-web-accessibility-for-e.vercel.app","http://localhost:5173", "http://localhost:5174"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-CSRF-Token"],
 )
 
 # Add GZip compression for responses > 1000 bytes
@@ -130,6 +205,9 @@ class CacheMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(CacheMiddleware)
 
+# Add CSRF protection middleware
+app.add_middleware(CSRFMiddleware)
+
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
@@ -143,7 +221,8 @@ async def favicon():
     return {}
 
 @app.post("/token", response_model=Token, tags=["Authentication"])
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute")
+async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return access token."""
     user = await authenticate_user(None, form_data.username, form_data.password)
 
@@ -164,7 +243,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     }
 
 @app.post("/register", tags=["Authentication"])
-async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
+@limiter.limit("3/minute")
+async def register_user(request: Request, user: UserCreate, background_tasks: BackgroundTasks):
     """Register a new user."""
     # Check if user already exists
     existing = await users_col.find_one({"email": user.email})
@@ -257,6 +337,58 @@ async def reset_password(reset_data: PasswordReset):
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """Get current user information."""
     return current_user
+
+@app.get("/csrf-token", tags=["Security"])
+async def get_csrf_token():
+    """
+    Get a CSRF token for state-changing operations.
+    Clients should include this token in the X-CSRF-Token header for POST/PUT/DELETE requests.
+    """
+    token = generate_csrf_token()
+    return {"csrf_token": token}
+
+@app.get("/ai/metrics", tags=["AI"])
+async def get_ai_metrics():
+    """
+    Get AI service performance metrics.
+    Provides insights into AI usage, response times, and cache effectiveness.
+    """
+    from services.ai_service import get_ai_metrics
+    return get_ai_metrics()
+
+@app.post("/demo-login", response_model=Token, tags=["Authentication"])
+async def demo_login():
+    """
+    Demo login endpoint that generates a temporary demo token without exposing credentials.
+    Uses the seeded test user from the database.
+    """
+    try:
+        # Authenticate with the seeded demo user
+        demo_user = await authenticate_user(None, "test@example.com", "password123")
+        
+        if not demo_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Demo user not found. Please ensure the database is properly seeded."
+            )
+        
+        # Generate access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": demo_user.email}, expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": demo_user.model_dump(exclude={"hashed_password"}),
+        }
+    except Exception as e:
+        logger.error(f"Demo login error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Demo login failed. Please try again later."
+        )
 
 # ============================================================================
 # ANALYSIS ENDPOINTS
