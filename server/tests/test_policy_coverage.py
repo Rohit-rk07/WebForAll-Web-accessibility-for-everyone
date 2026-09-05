@@ -218,19 +218,18 @@ class TestAIEndpoints:
         assert response.json() == payload
 
     def test_summary_success(self, mock_auth):
-        with patch("main.run_analysis_with_timeout"):
-            response = client.post(
-                "/ai/summary",
-                json={
-                    "results": {
-                        "violations": [{"impact": "critical"}, {"impact": "serious"}],
-                        "passes": [{"id": "a"}],
-                        "incomplete": [],
-                        "inapplicable": [],
-                    }
-                },
-                headers=csrf_headers(),
-            )
+        response = client.post(
+            "/ai/summary",
+            json={
+                "results": {
+                    "violations": [{"impact": "critical"}, {"impact": "serious"}],
+                    "passes": [{"id": "a"}],
+                    "incomplete": [],
+                    "inapplicable": [],
+                }
+            },
+            headers=csrf_headers(),
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["counts"]["violations"] == 2
@@ -238,19 +237,15 @@ class TestAIEndpoints:
 
 
 class TestRateLimitRetryInfo:
-    def test_handler_includes_retry_after_header(self):
+    @pytest.mark.asyncio
+    async def test_handler_includes_retry_after_header(self):
         from collections import namedtuple
+        from starlette.requests import Request
+
         fake_limit = namedtuple("Limit", ["granularity"])(60)
-
-        class FakeRequest:
-            state = None
-
-        class FakeState:
-            view_rate_limit = fake_limit
-
-        req = FakeRequest()
-        req.state = FakeState()
-        response = rate_limited_response(req, None)
+        fake_scope = {"type": "http", "state": {"view_rate_limit": fake_limit}}
+        req = Request(fake_scope)
+        response = await rate_limited_response(req, None)
         assert response.status_code == 429
         assert response.headers.get("Retry-After") == "60"
 
