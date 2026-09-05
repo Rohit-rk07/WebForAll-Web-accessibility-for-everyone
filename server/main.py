@@ -29,8 +29,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from starlette.responses import JSONResponse, Response
+from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from itsdangerous import URLSafeTimedSerializer
 from bs4 import BeautifulSoup
@@ -40,7 +40,7 @@ import uvicorn
 from auth import (
     Token, User, UserCreate, PasswordResetRequest, PasswordReset,
     authenticate_user, create_access_token, get_current_active_user,
-    initialize_default_users,
+    hash_password_async, initialize_default_users,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from services.db import users as users_col, password_reset_tokens as prt_col, analyses as analyses_col
@@ -48,9 +48,10 @@ from services import (
     send_welcome_email, send_password_reset_email,
     initialize_gemini, chat_completion, explain_accessibility_issue,
 )
+from services.content_filter import content_filter
 from models import (
     URLAnalysisRequest, HTMLAnalysisRequest, ChatCompletionRequest,
-    ExplainRequest, SummaryRequest
+    ExplainRequest, SummaryRequest, WCAGOptions
 )
 
 # Analysis import (keeping the existing dynamic analysis)
@@ -127,9 +128,11 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # For other state-changing operations, check CSRF token
         csrf_token = request.headers.get("X-CSRF-Token")
         if not csrf_token or not validate_csrf_token(csrf_token):
-            raise HTTPException(
+            # Return directly (rather than raising HTTPException) so the 403
+            # is emitted from middleware without exception-group propagation.
+            return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="CSRF token validation failed"
+                content={"detail": "CSRF token validation failed"},
             )
         
         return await call_next(request)
@@ -139,16 +142,25 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for FastAPI application."""
     # Startup
     logger.info(f"Running on {platform.system()}")
-    
+
+    def _start_background(name: str, coro) -> None:
+        """Run a startup task off the request path while logging completion/errors."""
+        async def _wrapped():
+            try:
+                await coro
+                logger.info(f"Startup task '{name}' completed")
+            except Exception as e:
+                logger.error(f"Startup task '{name}' failed: {str(e)}")
+
+        asyncio.create_task(_wrapped())
+        logger.info(f"Startup task '{name}' scheduled")
+
     # Initialize authentication system (indexes + seed) in background
-    import asyncio
-    asyncio.create_task(initialize_default_users())
-    logger.info("Authentication system initialization started in background")
-    
+    _start_background("auth-init", initialize_default_users())
+
     # Initialize AI services in background
-    asyncio.create_task(initialize_gemini_async())
-    logger.info("AI services initialization started in background")
-    
+    _start_background("gemini-init", initialize_gemini_async())
+
     yield
     
     # Shutdown - Clean up resources
@@ -182,8 +194,30 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+async def rate_limited_response(request: Request, exc: RateLimitExceeded):
+    """Return a 429 that tells clients when they may retry.
+
+    slowapi's default handler omits Retry-After; clients that honor it avoid
+    hammering an endpoint whose quota has been exhausted.
+    """
+    retry_after = 60
+    limit = getattr(request.state, "view_rate_limit", None)
+    if limit is not None:
+        try:
+            granularity = getattr(limit, "granularity", None)
+            if granularity:
+                retry_after = int(granularity)
+        except Exception:
+            pass
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": "Rate limit exceeded. Please wait and try again."},
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limited_response)
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -229,6 +263,12 @@ allowed_origins = os.environ.get(
 ).split(",")
 allowed_origins = [origin.strip() for origin in allowed_origins if origin.strip()]
 
+# With allow_credentials=True a wildcard origin would make CORS permissive for
+# any site. Refuse to boot in that configuration instead of silently weakening
+# the security boundary.
+if "*" in allowed_origins:
+    raise RuntimeError("ALLOWED_ORIGINS must not contain '*' when CORS credentials are enabled")
+
 APP_ENV = os.environ.get("APP_ENV", "development").lower()
 ALLOW_DEMO_LOGIN = os.environ.get("ALLOW_DEMO_LOGIN", "true" if APP_ENV != "production" else "false").lower() == "true"
 
@@ -262,13 +302,44 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Content-Security-Policy", "default-src 'self'")
-        if request.url.scheme == "https":
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        # HSTS must reflect the actual connection the browser used. Behind a
+        # TLS-terminating proxy (Render/Railway/Vercel) the app sees http but the
+        # `X-Forwarded-Proto` header reveals the real scheme.
+        is_https = request.url.scheme == "https" or (
+            request.headers.get("x-forwarded-proto", "").lower() == "https"
+        )
+        if is_https:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
         return response
 
 app.add_middleware(CacheMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+
+MAX_JSON_BYTES = 6 * 1024 * 1024
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject oversized write requests without buffering the whole body.
+
+    JSON bodies (e.g. /analyze/html, /ai/*) are independently bounded by their
+    Pydantic schemas; this layer is a cheap Content-Length gate that keeps
+    untyped or malformed requests from allocating large buffers.
+    """
+
+    async def dispatch(self, request, call_next):
+        if request.method in {"POST", "PUT", "PATCH"}:
+            content_length = request.headers.get("content-length")
+            if content_length and content_length.isdigit() and int(content_length) > MAX_JSON_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large"},
+                )
+        return await call_next(request)
+
+app.add_middleware(RequestSizeLimitMiddleware)
 
 # Add CSRF protection middleware
 app.add_middleware(CSRFMiddleware)
@@ -276,11 +347,36 @@ app.add_middleware(CSRFMiddleware)
 MAX_HTML_BYTES = 5 * 1024 * 1024
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
+_HOSTNAME_BLOCK_SUFFIXES = (
+    ".local",
+    ".internal",
+    ".localhost",
+    ".lan",
+    ".home.arpa",
+    ".corp",
+    ".intranet",
+)
+_HOSTNAME_BLOCK_EXACT = {"localhost", "metadata", "metadata.google.internal", "metadata.google"}
+
+
+def _ip_is_global(address: str) -> bool:
+    """Return True only for globally routable addresses (IPv4-mapped IPv6 normalized)."""
+    ip = ipaddress.ip_address(address)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_unspecified
+
+
 async def validate_public_url(url: str) -> None:
     """Reject non-public destinations before launching the browser."""
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise HTTPException(status_code=400, detail="Only public HTTP(S) URLs are supported")
+
+    hostname = parsed.hostname.rstrip(".").lower()
+    # Block internal-corporate/metadata names even if DNS resolves them oddly.
+    if hostname in _HOSTNAME_BLOCK_EXACT or hostname.endswith(_HOSTNAME_BLOCK_SUFFIXES):
+        raise HTTPException(status_code=400, detail="Private and internal URLs are not allowed")
 
     try:
         addresses = await asyncio.to_thread(
@@ -290,14 +386,50 @@ async def validate_public_url(url: str) -> None:
         raise HTTPException(status_code=400, detail="The URL hostname could not be resolved")
 
     for address in {item[4][0] for item in addresses}:
-        ip = ipaddress.ip_address(address)
-        if not ip.is_global:
+        if not _ip_is_global(address):
             raise HTTPException(status_code=400, detail="Private and internal URLs are not allowed")
 
 def require_successful_analysis(result):
     if not isinstance(result, dict) or result.get("success") is False:
         raise HTTPException(status_code=502, detail="The accessibility analysis failed")
     return result
+
+ANALYSIS_TIMEOUT_SECONDS = int(os.environ.get("ANALYSIS_TIMEOUT_SECONDS", "90"))
+AI_TIMEOUT_SECONDS = int(os.environ.get("AI_TIMEOUT_SECONDS", "30"))
+
+async def run_analysis_with_timeout(url: str, wcag_options: dict) -> dict:
+    """Run a browser analysis bounded by an overall deadline (504 on timeout)."""
+    try:
+        return await asyncio.wait_for(
+            playwright_analyze_url(url, wcag_options),
+            timeout=ANALYSIS_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Analysis timed out after {ANALYSIS_TIMEOUT_SECONDS}s for {url[:80]}")
+        raise HTTPException(
+            status_code=504,
+            detail="The analysis timed out. The page may be too large or slow to load.",
+        )
+
+def _sanitize_analysis_result(obj):
+    """Strip executable markup from stored analysis output.
+
+    axe results embed the offending element's HTML in ``nodes[].html``. That is
+    stored and later returned via /history, so each ``html`` string is sanitized
+    as defense-in-depth against stored XSS.
+    """
+    if isinstance(obj, dict):
+        return {
+            key: (
+                content_filter.sanitize_html_output(value)
+                if key == "html" and isinstance(value, str)
+                else _sanitize_analysis_result(value)
+            )
+            for key, value in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_sanitize_analysis_result(value) for value in obj]
+    return obj
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -346,11 +478,10 @@ async def register_user(request: Request, user: UserCreate, background_tasks: Ba
         )
     
     # Create new user
-    from auth.auth_utils import get_password_hash
     await users_col.insert_one({
         "email": user.email,
         "full_name": user.full_name,
-        "hashed_password": get_password_hash(user.password),
+        "hashed_password": await hash_password_async(user.password),
         "disabled": False,
         "created_at": datetime.utcnow(),
     })
@@ -423,8 +554,10 @@ async def reset_password(request: Request, reset_data: PasswordReset):
         )
 
     # Update password
-    from auth.auth_utils import get_password_hash
-    await users_col.update_one({"email": email}, {"$set": {"hashed_password": get_password_hash(reset_data.new_password)}})
+    await users_col.update_one(
+        {"email": email},
+        {"$set": {"hashed_password": await hash_password_async(reset_data.new_password)}},
+    )
 
     return {"message": "Password reset successfully"}
 
@@ -432,6 +565,17 @@ async def reset_password(request: Request, reset_data: PasswordReset):
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """Get current user information."""
     return current_user
+
+@app.delete("/users/me", tags=["Authentication"])
+async def delete_users_me(current_user: User = Depends(get_current_active_user)):
+    """Permanently delete the current user's account and all of their data."""
+    email = current_user.email
+    await analyses_col.delete_many({"owner_email": email})
+    await prt_col.delete_many({"email": email})
+    res = await users_col.delete_one({"email": email})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Account and all associated data deleted"}
 
 @app.get("/csrf-token", tags=["Security"])
 async def get_csrf_token():
@@ -443,7 +587,8 @@ async def get_csrf_token():
     return {"csrf_token": token}
 
 @app.get("/ai/metrics", tags=["AI"])
-async def get_ai_metrics(current_user: User = Depends(get_current_active_user)):
+@limiter.limit("30/minute")
+async def get_ai_metrics(request: Request, current_user: User = Depends(get_current_active_user)):
     """
     Get AI service performance metrics.
     Provides insights into AI usage, response times, and cache effectiveness.
@@ -498,7 +643,8 @@ async def demo_login(request: Request):
 # ============================================================================
 
 @app.post("/analyze/url", tags=["Analysis"])
-async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("10/minute")
+async def analyze_url(request: Request, request_body: URLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
     """
     Analyze a URL for accessibility issues.
     
@@ -509,20 +655,20 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
         dict: Analysis results
     """
     try:
-        logger.info(f"Analyzing URL: {request.url}")
-        await validate_public_url(str(request.url))
+        logger.info(f"Analyzing URL: {request_body.url}")
+        await validate_public_url(str(request_body.url))
         
         # Convert wcag_options to dict if provided
         wcag_options = None
-        if request.wcag_options:
+        if request_body.wcag_options:
             wcag_options = {
-                "wcag_version": request.wcag_options.wcag_version,
-                "level": request.wcag_options.level,
-                "best_practice": request.wcag_options.best_practice
+                "wcag_version": request_body.wcag_options.wcag_version,
+                "level": request_body.wcag_options.level,
+                "best_practice": request_body.wcag_options.best_practice
             }
         
         # Use dynamic analysis only
-        result = await playwright_analyze_url(str(request.url), wcag_options)
+        result = await run_analysis_with_timeout(str(request_body.url), wcag_options)
         result = require_successful_analysis(result)
         
         # Persist analysis for the authenticated user and return its id
@@ -538,11 +684,11 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
             insert_doc = {
                 "owner_email": current_user.email,
                 "input_type": "url",
-                "input_ref": str(request.url),
+                "input_ref": str(request_body.url),
                 "wcag_options": wcag_options,
                 "violations_count": violations_count,
                 "summary": result.get("summary") if isinstance(result, dict) else None,
-                "result": result if isinstance(result, dict) else {"raw": result},
+                "result": _sanitize_analysis_result(result) if isinstance(result, dict) else {"raw": result},
                 "created_at": datetime.utcnow(),
             }
             insert_res = await analyses_col.insert_one(insert_doc)
@@ -555,14 +701,15 @@ async def analyze_url(request: URLAnalysisRequest, current_user: User = Depends(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error analyzing URL {request.url}: {str(e)}")
+        logger.error(f"Error analyzing URL {request_body.url}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Analysis failed. Please try again later."
         )
 
 @app.post("/analyze/html", tags=["Analysis"])
-async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("10/minute")
+async def analyze_html(request: Request, request_body: HTMLAnalysisRequest, current_user: User = Depends(get_current_active_user)):
     """
     Analyze HTML content for accessibility issues.
     
@@ -577,19 +724,19 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         
         # Convert wcag_options to dict if provided
         wcag_options = None
-        if request.wcag_options:
+        if request_body.wcag_options:
             wcag_options = {
-                "wcag_version": request.wcag_options.wcag_version,
-                "level": request.wcag_options.level,
-                "best_practice": request.wcag_options.best_practice
+                "wcag_version": request_body.wcag_options.wcag_version,
+                "level": request_body.wcag_options.level,
+                "best_practice": request_body.wcag_options.best_practice
             }
         
         # Create data URL for dynamic analysis
         import base64
-        html_document = request.content
-        if request.base_url:
+        html_document = request_body.content
+        if request_body.base_url:
             soup = BeautifulSoup(html_document, "html.parser")
-            base_tag = soup.new_tag("base", href=str(request.base_url))
+            base_tag = soup.new_tag("base", href=str(request_body.base_url))
             if soup.head:
                 soup.head.insert(0, base_tag)
             else:
@@ -605,7 +752,7 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         data_url = f"data:text/html;base64,{html_b64}"
         
         # Use dynamic analysis with data URL
-        result = await playwright_analyze_url(data_url, wcag_options)
+        result = await run_analysis_with_timeout(data_url, wcag_options)
         result = require_successful_analysis(result)
         
         # Persist + return id
@@ -619,7 +766,7 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
                 "wcag_options": wcag_options,
                 "violations_count": violations_count,
                 "summary": result.get("summary") if isinstance(result, dict) else None,
-                "result": result if isinstance(result, dict) else {"raw": result},
+                "result": _sanitize_analysis_result(result) if isinstance(result, dict) else {"raw": result},
                 "created_at": datetime.utcnow(),
             }
             insert_res = await analyses_col.insert_one(insert_doc)
@@ -638,7 +785,8 @@ async def analyze_html(request: HTMLAnalysisRequest, current_user: User = Depend
         )
 
 @app.post("/analyze/file", tags=["Analysis"])
-async def analyze_file(current_user: User = Depends(get_current_active_user), file: UploadFile = File(...), wcag_options: str = Form(None)):
+@limiter.limit("10/minute")
+async def analyze_file(request: Request, current_user: User = Depends(get_current_active_user), file: UploadFile = File(...), wcag_options: str = Form(None)):
     """
     Analyze an uploaded HTML file for accessibility issues.
     
@@ -674,13 +822,20 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="The HTML file must be UTF-8 encoded")
         
-        # Parse WCAG options if provided
+        # Parse + validate WCAG options if provided (reject invalid versions/levels)
         parsed_wcag_options = None
         if wcag_options:
             try:
-                parsed_wcag_options = json.loads(wcag_options)
+                raw = json.loads(wcag_options)
             except json.JSONDecodeError:
-                logger.warning("Invalid WCAG options JSON, using defaults")
+                raise HTTPException(status_code=400, detail="Invalid WCAG options: must be valid JSON")
+            try:
+                parsed_wcag_options = WCAGOptions(**raw).model_dump()
+            except Exception as ve:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid WCAG options: wcag_version must be one of wcag2/wcag21/wcag22 and level one of a/aa/aaa",
+                )
         
         # Create data URL for dynamic analysis
         import base64
@@ -689,7 +844,7 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
         data_url = f"data:text/html;base64,{html_b64}"
         
         # Use dynamic analysis with data URL
-        result = await playwright_analyze_url(data_url, parsed_wcag_options)
+        result = await run_analysis_with_timeout(data_url, parsed_wcag_options)
         result = require_successful_analysis(result)
         
         # Persist + return id
@@ -703,7 +858,7 @@ async def analyze_file(current_user: User = Depends(get_current_active_user), fi
                 "wcag_options": parsed_wcag_options,
                 "violations_count": violations_count,
                 "summary": result.get("summary") if isinstance(result, dict) else None,
-                "result": result if isinstance(result, dict) else {"raw": result},
+                "result": _sanitize_analysis_result(result) if isinstance(result, dict) else {"raw": result},
                 "created_at": datetime.utcnow(),
             }
             insert_res = await analyses_col.insert_one(insert_doc)
@@ -732,16 +887,25 @@ async def ai_chat_completion(request: Request, payload: ChatCompletionRequest, c
     request_id = getattr(request.state, "request_id", "unknown")
     try:
         messages = [{"role": msg.role, "content": msg.content} for msg in payload.messages]
-        response = await asyncio.to_thread(
-            chat_completion,
-            messages=messages,
-            model=payload.model,
-            temperature=payload.temperature,
-            max_tokens=payload.max_tokens,
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                chat_completion,
+                messages=messages,
+                model=payload.model,
+                temperature=payload.temperature,
+                max_tokens=payload.max_tokens,
+            ),
+            timeout=AI_TIMEOUT_SECONDS,
         )
         return response
     except HTTPException:
         raise
+    except asyncio.TimeoutError:
+        logger.error(f"AI chat timed out (request_id={request_id})")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"AI service timed out. Reference: {request_id}"
+        )
     except Exception as e:
         logger.error(f"AI chat error (request_id={request_id}): {str(e)}")
         raise HTTPException(
@@ -755,10 +919,19 @@ async def ai_explain_issue(request: Request, payload: ExplainRequest, current_us
     """Generate an explanation and fix for an accessibility issue."""
     request_id = getattr(request.state, "request_id", "unknown")
     try:
-        response = await asyncio.to_thread(explain_accessibility_issue, payload.issue)
+        response = await asyncio.wait_for(
+            asyncio.to_thread(explain_accessibility_issue, payload.issue, current_user.email),
+            timeout=AI_TIMEOUT_SECONDS,
+        )
         return response
     except HTTPException:
         raise
+    except asyncio.TimeoutError:
+        logger.error(f"AI explain timed out (request_id={request_id})")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"AI service timed out. Reference: {request_id}"
+        )
     except Exception as e:
         logger.error(f"AI explain error (request_id={request_id}): {str(e)}")
         raise HTTPException(
@@ -835,7 +1008,8 @@ async def health_check():
 # ============================================================================
 
 @app.get("/history", tags=["History"])
-async def list_history(limit: int = 50, skip: int = 0, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("60/minute")
+async def list_history(request: Request, limit: int = 50, skip: int = 0, current_user: User = Depends(get_current_active_user)):
     """List recent analyses for the current user with pagination."""
     # Validate and clamp parameters
     limit = max(1, min(limit, 100))  # Max 100 items per page
@@ -877,7 +1051,8 @@ async def list_history(limit: int = 50, skip: int = 0, current_user: User = Depe
     }
 
 @app.get("/history/{item_id}", tags=["History"])
-async def get_history_item(item_id: str, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("60/minute")
+async def get_history_item(request: Request, item_id: str, current_user: User = Depends(get_current_active_user)):
     try:
         oid = ObjectId(item_id)
     except Exception:
@@ -889,7 +1064,8 @@ async def get_history_item(item_id: str, current_user: User = Depends(get_curren
     return doc
 
 @app.delete("/history/{item_id}", tags=["History"])
-async def delete_history_item(item_id: str, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("30/minute")
+async def delete_history_item(request: Request, item_id: str, current_user: User = Depends(get_current_active_user)):
     try:
         oid = ObjectId(item_id)
     except Exception:
@@ -906,6 +1082,7 @@ def playwright_health_check():
 
     try:
         # Lightweight browser availability check only; avoid running a full analysis on health probes.
+        exit_code = None
         try:
             import subprocess
             browser_check = subprocess.run(
@@ -914,33 +1091,33 @@ def playwright_health_check():
                 text=True,
                 timeout=10,
             )
-            browser_status = f"Exit code: {browser_check.returncode}, Output: {browser_check.stdout[:200]}"
-        except Exception as e:
-            browser_status = f"Browser check failed: {str(e)}"
+            exit_code = browser_check.returncode
+        except Exception:
+            exit_code = None
 
         return {
-            "status": "healthy" if "failed" not in browser_status.lower() else "unhealthy",
+            "status": "healthy" if exit_code == 0 else "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
-            "playwright_available": True,
+            "playwright_available": exit_code == 0,
             "error": None,
-            "browser_error": False,
+            "browser_error": exit_code != 0,
             "navigation_error": False,
             "axe_error": False,
             "analysis_error": False,
             "violations_found": 0,
-            "browser_status": browser_status,
+            "browser_status": f"Exit code: {exit_code}",
             "result_details": {
                 "success": True,
                 "mode": "health_check",
                 "tags_used": []
             },
         }
-    except Exception as e:
+    except Exception:
         return {
             "status": "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
             "playwright_available": False,
-            "error": str(e),
+            "error": "playwright browser check failed",
         }
 
 if __name__ == "__main__":

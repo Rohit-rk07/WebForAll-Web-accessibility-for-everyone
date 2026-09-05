@@ -146,15 +146,16 @@ curl -X POST http://localhost:8000/ai/chat \
 ## Security Considerations
 
 - **API Key Protection**: Never commit .env files to version control
-- **Rate Limiting**: Implement client-side request throttling
-- **Input Validation**: All user inputs are sanitized before AI processing
-- **Error Disclosure**: Sensitive error details are logged, not exposed to users
+- **Rate Limiting**: `/ai/*` endpoints are limited to 30 requests/minute per IP
+- **Input Validation**: All user inputs are validated (bounded lengths, model allow-list) before AI processing
+- **Error Disclosure**: Sensitive error details are logged, not exposed to users; errors include an `X-Request-ID`-style `Reference` id for tracing
+- **Per-User Cache Scope**: AI explanation responses are cached with a per-user scope so one user's private scan data never leaks through another user's cache entries
 
 ## Performance Optimization
 
-- **Response Caching**: Consider caching common explanations
+- **Response Caching**: AI explanations are cached for 2 hours (in-memory, per-user scope)
 - **Request Batching**: Group multiple issues for bulk processing
-- **Timeout Handling**: 30-second timeout for AI requests
+- **Timeout Handling**: 30-second timeout enforced server-side on all AI requests (`AI_TIMEOUT_SECONDS`, returns 504; configured via `asyncio.wait_for` around the provider call)
 - **Fallback Speed**: Static responses serve immediately when AI fails
 
 ## Future Improvements

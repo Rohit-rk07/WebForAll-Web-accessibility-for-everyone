@@ -104,7 +104,7 @@ const WCAGOptions = ({ options, onChange, colors }) => {
                 {getVersionDisplayName(options.wcag_version)} - Level {options.level.toUpperCase()}
               </Typography>
               <Tooltip title="Select which WCAG version and level to check against">
-                <IconButton size="small">
+                <IconButton size="small" aria-label="Help about WCAG options">
                   <HelpOutline fontSize="small" sx={{ color: colors.lightText }} />
                 </IconButton>
               </Tooltip>

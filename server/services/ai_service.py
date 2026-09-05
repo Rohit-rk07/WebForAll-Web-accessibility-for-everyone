@@ -166,13 +166,15 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
             "content": "Sorry, I'm having trouble processing your request right now."
         }
 
-def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
+def explain_accessibility_issue(issue: Dict[str, Any], user_scope: str = "") -> Dict[str, Any]:
     """
     Generate explanation and fix for an accessibility issue with caching and metrics.
-    
+
     Args:
         issue: Accessibility issue data from axe-core
-        
+        user_scope: Opaque per-user identifier so cached responses are never
+            shared across users (private scan HTML is part of the cache key).
+
     Returns:
         Dict containing fixed code and brief explanation
     """
@@ -181,7 +183,7 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
     
     # Check cache first
     issue_id = issue.get('id', 'unknown')
-    cached_explanation = get_cached_ai_explanation(issue_id, issue)
+    cached_explanation = get_cached_ai_explanation(issue_id, issue, user_scope)
     if cached_explanation:
         record_ai_metric("cached_response", 1)
         logger.info(f"Returning cached explanation for issue {issue_id}")
@@ -303,7 +305,7 @@ def explain_accessibility_issue(issue: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         # Cache the result
-        cache_ai_explanation(issue_id, issue, result, ttl=7200)  # 2 hours
+        cache_ai_explanation(issue_id, issue, result, user_scope=user_scope, ttl=7200)  # 2 hours
         
         # Record metrics
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000

@@ -13,6 +13,7 @@ import {
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
+import { passwordInvalidReason } from "../utils/passwordPolicy";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -42,8 +43,9 @@ export default function ResetPassword() {
       );
       return;
     }
-    if (pw1.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    const passwordHint2 = passwordInvalidReason(pw1);
+    if (passwordHint2) {
+      setError(passwordHint2);
       return;
     }
     if (pw1 !== pw2) {

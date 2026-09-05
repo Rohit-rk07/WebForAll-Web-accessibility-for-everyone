@@ -296,7 +296,7 @@ ${aiSuggestion.fixedCode}
                       ✅ Fixed Code
                     </Typography>
                     <Tooltip title="Copy to clipboard">
-                      <IconButton size="small" onClick={() => copyToClipboard(aiSuggestion.fixedCode)}>
+                      <IconButton size="small" aria-label="Copy fixed code to clipboard" onClick={() => copyToClipboard(aiSuggestion.fixedCode)}>
                         <ContentCopy fontSize="small" />
                       </IconButton>
                     </Tooltip>

@@ -149,8 +149,8 @@ Content-Type: application/json
 {
   "url": "https://example.com",
   "wcag_options": {
-    "version": "2.1",
-    "level": "AA"
+    "wcag_version": "wcag21",
+    "level": "aa"
   }
 }
 ```
@@ -158,8 +158,9 @@ Content-Type: application/json
 **Parameters:**
 - `url` (string, required): URL to analyze
 - `wcag_options` (object, optional):
-  - `version` (string): WCAG version ("2.0", "2.1", "2.2")
-  - `level` (string): Conformance level ("A", "AA", "AAA")
+  - `wcag_version` (string): WCAG version, one of `wcag2` (2.0), `wcag21` (2.1), `wcag22` (2.2)
+  - `level` (string): Conformance level, one of `a`, `aa`, `aaa` (lowercase)
+  - `best_practice` (boolean, default `true`): Include best-practice checks
 
 **Response:**
 ```json
@@ -210,13 +211,18 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "html": "<html><body><h1>Heading</h1></body></html>",
+  "content": "<html><body><h1>Heading</h1></body></html>",
   "wcag_options": {
-    "version": "2.1",
-    "level": "AA"
+    "wcag_version": "wcag21",
+    "level": "aa"
   }
 }
 ```
+
+**Parameters:**
+- `content` (string, required): HTML document to analyze (max 5 MB)
+- `base_url` (string, optional): Base URL to resolve relative resources against
+- `wcag_options` (object, optional): Same shape as `POST /analyze/url`
 
 **Response:** Same format as URL analysis
 
@@ -232,8 +238,12 @@ Authorization: Bearer <token>
 Content-Type: multipart/form-data
 
 file: <HTML file>
-wcag_options: {"version": "2.1", "level": "AA"}
+wcag_options: {"wcag_version": "wcag21", "level": "aa", "best_practice": true}
 ```
+
+**Parameters:**
+- `file` (file, required): HTML file to analyze (must end in `.html` or `.htm`, max 5 MB, UTF-8 encoded)
+- `wcag_options` (string, optional): JSON string encoding the same shape as `POST /analyze/url`. Invalid versions/levels are rejected with a `400` response.
 
 **Response:** Same format as URL analysis
 
@@ -325,22 +335,36 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "violations": [...],
-  "passes": [...]
+  "results": {
+    "violations": [...],
+    "passes": [...],
+    "incomplete": [...],
+    "inapplicable": [...]
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "summary": "This page has 5 critical issues that need immediate attention...",
-  "priority_actions": [
-    "Fix color contrast issues",
-    "Add alt text to images",
-    "Improve keyboard navigation"
-  ]
+  "summary": "Found 5 violations, 10 passes, 2 incomplete checks, and 0 inapplicable checks.",
+  "score": 52,
+  "counts": {
+    "violations": 5,
+    "passes": 10,
+    "incomplete": 2,
+    "inapplicable": 0
+  },
+  "severity": {
+    "critical": 1,
+    "serious": 2,
+    "moderate": 1,
+    "minor": 1
+  }
 }
 ```
+
+**Note:** This endpoint computes a score and summary locally from the provided results; it does not call an external AI provider.
 
 ### AI Metrics
 
@@ -387,6 +411,22 @@ Authorization: Bearer <token>
 }
 ```
 
+#### DELETE /users/me
+Permanently delete the current user's account and all associated data (analyses, password-reset tokens). Requires authentication.
+
+**Request:**
+```http
+DELETE /users/me
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "message": "Account and all associated data deleted"
+}
+```
+
 ---
 
 ## History Management
@@ -396,13 +436,13 @@ Get user's analysis history.
 
 **Request:**
 ```http
-GET /history?page=1&limit=10
+GET /history?limit=50&skip=0
 Authorization: Bearer <token>
 ```
 
 **Parameters:**
-- `page` (integer, optional): Page number (default: 1)
-- `limit` (integer, optional): Items per page (default: 10)
+- `limit` (integer, optional): Items per page (default: 50, max: 100)
+- `skip` (integer, optional): Number of items to skip (default: 0)
 
 **Response:**
 ```json
@@ -410,20 +450,23 @@ Authorization: Bearer <token>
   "items": [
     {
       "id": "analysis_id",
-      "url": "https://example.com",
-      "timestamp": "2026-09-04T12:00:00Z",
+      "input_type": "url",
+      "input_ref": "https://example.com",
+      "wcag_options": { "wcag_version": "wcag21", "level": "aa" },
       "violations_count": 5,
-      "compliance_percentage": 85.5
+      "created_at": "2026-09-04T12:00:00Z"
     }
   ],
   "pagination": {
-    "page": 1,
-    "limit": 10,
     "total": 50,
-    "pages": 5
+    "limit": 50,
+    "skip": 0,
+    "has_more": false
   }
 }
 ```
+
+**Note:** The list view omits the bulky `result` and `summary` payloads for performance. Fetch a single item via `GET /history/{id}` for full details.
 
 #### GET /history/{id}
 Get specific analysis details.
@@ -435,6 +478,22 @@ Authorization: Bearer <token>
 ```
 
 **Response:** Full analysis results
+
+#### DELETE /history/{id}
+Delete a specific analysis. Only the owning user can delete it.
+
+**Request:**
+```http
+DELETE /history/analysis_id
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "message": "Analysis deleted"
+}
+```
 
 ---
 
@@ -468,11 +527,15 @@ All endpoints may return error responses:
 ### Common Error Codes
 
 - `400`: Bad Request - Invalid input parameters
-- `401`: Unauthorized - Missing or invalid token
+- `401`: Unauthorized - Missing or invalid token, or disabled account
 - `403`: Forbidden - Insufficient permissions or CSRF validation failed
 - `404`: Not Found - Resource not found
+- `409`: Conflict - Resource already exists (e.g. duplicate registration email)
+- `413`: Payload Too Large - Request body or uploaded file exceeds limits
 - `429`: Too Many Requests - Rate limit exceeded
-- `500`: Internal Server Error - Server error
+- `500`: Internal Server Error - Server error (AI errors include a traceable `Reference` id)
+- `502`: Bad Gateway - Browser analysis failed to produce results
+- `504`: Gateway Timeout - Analysis or AI request exceeded its deadline
 
 ---
 
@@ -489,8 +552,8 @@ All endpoints may return error responses:
 | /analyze/url | 10 requests/minute |
 | /analyze/html | 10 requests/minute |
 | /analyze/file | 10 requests/minute |
-
-Rate limit headers are included in responses:
+| GET /history, GET /history/{id} | 60 requests/minute |
+| DELETE /history/{id} | 30 requests/minute |
 
 Rate limit headers are included in responses:
 - `X-RateLimit-Limit`: Total requests allowed

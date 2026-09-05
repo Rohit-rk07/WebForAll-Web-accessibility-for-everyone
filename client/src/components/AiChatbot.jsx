@@ -25,6 +25,7 @@ const AiChatbot = React.memo(() => {
   const [isLoading, setIsLoading] = useState(false);
   const [chatWidth, setChatWidth] = useState(350);
   const messagesRef = useRef(messages);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -100,7 +101,7 @@ const AiChatbot = React.memo(() => {
    * Handles sending a message
    */
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     // Add user message
     const userMessage = { role: "user", content: input };
@@ -143,6 +144,17 @@ const AiChatbot = React.memo(() => {
     }
   };
 
+  // Close the panel with Escape and move focus when it opens/closes
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") toggleChat();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    inputRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       {/* Floating Button */}
@@ -158,6 +170,7 @@ const AiChatbot = React.memo(() => {
           <Button
             variant="contained"
             color="primary"
+            aria-label={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
             onClick={toggleChat}
             sx={{
               borderRadius: "50%",
@@ -216,14 +229,19 @@ const AiChatbot = React.memo(() => {
           </Typography>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Tooltip title={chatWidth >= 600 ? "Minimize" : "Expand"}>
-              <IconButton
-                size="small"
-                onClick={() => setChatWidth(chatWidth >= 600 ? 350 : 1500)}
-              >
-                {chatWidth >= 600 ? <Minimize /> : <Maximize />}
-              </IconButton>
+<IconButton
+              size="small"
+              aria-label="Resize AI assistant panel"
+              onClick={() => setChatWidth(chatWidth >= 600 ? 350 : 1500)}
+            >
+              {chatWidth >= 600 ? <Minimize /> : <Maximize />}
+            </IconButton>
             </Tooltip>
-            <IconButton size="small" onClick={toggleChat}>
+            <IconButton
+              size="small"
+              aria-label="Close AI assistant"
+              onClick={toggleChat}
+            >
               <Close fontSize="small" />
             </IconButton>
           </Box>
@@ -393,9 +411,10 @@ const AiChatbot = React.memo(() => {
           }}
         >
           <TextField
+            inputRef={inputRef}
             fullWidth
             variant="outlined"
-            placeholder="Ask about accessibility..."
+            label="Ask about accessibility..."
             size="small"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -406,6 +425,7 @@ const AiChatbot = React.memo(() => {
           />
           <Button
             variant="contained"
+            aria-label="Send message"
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
             sx={{ minWidth: "auto", px: 2 }}

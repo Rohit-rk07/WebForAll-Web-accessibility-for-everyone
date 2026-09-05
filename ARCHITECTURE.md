@@ -204,34 +204,52 @@ Business logic is separated into service modules (`ai_service.py`, `email_servic
 Global state management using React Context for authentication and theme management.
 
 ### 4. Middleware Pattern
-FastAPI middleware for CORS, GZip compression, caching, and rate limiting.
+FastAPI middleware for CORS, GZip compression, caching, security headers, request-size limits, CSRF, request-ID tracing, and rate limiting.
 
 ### 5. Factory Pattern
 Playwright browser instances are created and managed through factory-like functions.
 
+## Operational Decisions
+
+- **Startup tasks**: `initialize_default_users()` and Gemini configuration run as background tasks that log completion or failure (never silently dropped).
+- **Account deletion**: `DELETE /users/me` removes the user, all their analyses, and password-reset tokens.
+- **Registration enumeration**: `/register` returns `409` for an existing email, intentionally revealing account existence. This is accepted so users get clear duplicate-registration feedback; login, password reset, and other auth flows do **not** enumerate users.
+- **Token storage**: the access token is kept in `localStorage` for a simple SPA deployment. Risks are mitigated with response sanitization, CSP (incl. `frame-ancestors 'none'`), `nosniff`, and a short token lifetime.
+- **`/ai/summary`** is a local computation (severity counts + score), not an external AI call, keeping summary generation fast and free of provider latency/cost.
+
 ## Security Architecture
 
 ### Authentication
-- JWT-based stateless authentication
-- Password hashing with bcrypt
-- Token expiration (30 minutes)
+- JWT-based stateless authentication (HS256, `exp`/`iss`/`aud` validated)
+- Password hashing with bcrypt via Passlib, executed off the event loop (`asyncio.to_thread`)
+- Token expiration configurable via `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30)
+- Disabled accounts are rejected with `401` and `WWW-Authenticate`
 - Protected routes with dependency injection
 
 ### Authorization
 - Role-based access control (RBAC) ready
 - User-specific data isolation (owner_email in analyses)
 - Session management through token validation
+- AI explanation cache is scoped per user so private scan snippets never leak across accounts
 
 ### Rate Limiting
-- Login endpoint: 5 requests per minute
-- Registration endpoint: 3 requests per minute
-- Password reset: Cooldown period (2 minutes)
+- Login (`/token`): 5 requests per minute
+- Registration (`/register`): 3 requests per minute
+- Demo login: 5 requests per minute
+- Forgot password: 5 requests per minute; Reset password: 10 requests per minute
+- AI endpoints (`/ai/*`): 30 requests per minute
+- Analysis endpoints (`/analyze/*`): 10 requests per minute
+- History reads: 60 requests per minute; history deletes: 30 requests per minute
 
 ### Data Protection
 - Environment variables for sensitive data
 - MongoDB connection with TLS
-- CORS configuration with specific origins
-- Input validation on all endpoints
+- CORS with specific origins (wildcard origins rejected at startup)
+- Input validation on all endpoints (WCAG version/level are `Literal` enums, sizes bounded)
+- 6 MB JSON body-size gate in middleware (413)
+- Browser/AI timeouts (`ANALYSIS_TIMEOUT_SECONDS`, `AI_TIMEOUT_SECONDS`)
+- Stored axe `nodes[].html` is sanitized before persistence (defense-in-depth against stored XSS)
+- Security headers on every response: `nosniff`, `DENY`, `frame-ancestors 'none'`, Permissions-Policy, HSTS behind TLS
 
 ## Performance Optimization
 
@@ -334,19 +352,23 @@ Playwright browser instances are created and managed through factory-like functi
 
 ### Endpoint Categories
 - **Authentication**: `/token`, `/register`, `/demo-login`, `/forgot-password`, `/reset-password`
+- **User**: `GET /users/me`, `DELETE /users/me`
 - **Analysis**: `/analyze/url`, `/analyze/html`, `/analyze/file`
-- **AI**: `/ai/chat`, `/ai/explain`, `/ai/summary`
-- **History**: `/history`, `/history/{id}`
+- **AI**: `/ai/chat`, `/ai/explain`, `/ai/summary`, `/ai/metrics`
+- **History**: `/history`, `/history/{id}` (GET/DELETE)
 - **System**: `/`, `/health`, `/health/playwright`
 
+### API Versioning
+Endpoints are not prefixed with a version path (e.g. `/v1/`). This is an accepted trade-off: it avoids breaking the current client deployments, but means future breaking changes must be coordinated across client and server. When a breaking change is needed, introduce `/v1/...` aliases before removing old routes.
+
 ### Response Format
+Successful responses return plain JSON. Errors use FastAPI's standard shape:
 ```json
 {
-  "data": { /* response data */ },
-  "error": null,
-  "status": "success"
+  "detail": "Human-readable error message"
 }
 ```
+`X-Request-ID` is set on every response for tracing.
 
 ## State Management
 

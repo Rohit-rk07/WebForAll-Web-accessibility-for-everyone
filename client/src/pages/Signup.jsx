@@ -25,6 +25,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
+import { passwordInvalidReason } from "../utils/passwordPolicy";
 
 /**
  * Signup page component
@@ -66,8 +67,9 @@ const Signup = () => {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+    const passwordHint = passwordInvalidReason(password);
+    if (passwordHint) {
+      setError(passwordHint);
       return;
     }
 

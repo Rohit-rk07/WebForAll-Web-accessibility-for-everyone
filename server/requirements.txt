@@ -1,6 +1,6 @@
-fastapi==0.116.1
+fastapi==0.141.1
 uvicorn==0.34.0
-pydantic==2.7.1
+pydantic==2.13.5
 playwright==1.41.1
 beautifulsoup4==4.13.0
 requests==2.33.0
@@ -14,10 +14,10 @@ bcrypt==3.2.2
 email-validator==2.1.0
 wcag-contrast-ratio==0.9
 pytest==9.0.3
-pytest-asyncio==0.23.5
+pytest-asyncio==1.4.0
 black==26.3.1
 flake8==7.0.0
-google-generativeai==0.3.2
+google-generativeai==0.8.0
 protobuf==5.29.6
 python-dotenv==1.2.2
 dnspython==2.6.1

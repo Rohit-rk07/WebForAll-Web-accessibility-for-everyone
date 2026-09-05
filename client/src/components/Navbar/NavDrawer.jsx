@@ -69,7 +69,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
           <>
             {navItems.map((item) => (
               <ListItem 
-                component="div"
+                component="button" type="button"
                 onClick={() => {
                   navigate(item.path);
                   onClose();
@@ -89,7 +89,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
             ))}
             <Divider sx={{ my: 1, borderColor: colors.border }} />
             <ListItem 
-              component="div"
+              component="button" type="button"
               onClick={() => {
                 navigate('/login');
                 onClose();
@@ -109,7 +109,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
         ) : (
           <>
             <ListItem 
-              component="div"
+              component="button" type="button"
               onClick={() => {
                 navigate('/dashboard/home');
                 onClose();
@@ -126,7 +126,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
               <ListItemText primary="Dashboard" />
             </ListItem>
             <ListItem 
-              component="div"
+              component="button" type="button"
               onClick={() => {
                 navigate('/dashboard/history');
                 onClose();
@@ -145,7 +145,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
             <Divider sx={{ my: 1, borderColor: colors.border }} />
             {navItems.map((item) => (
               <ListItem 
-                component="div"
+                component="button" type="button"
                 key={item.text}
                 onClick={() => {
                   navigate(item.path);
@@ -165,7 +165,7 @@ const NavDrawer = ({ navItems, isLoggedIn, navigate, onClose, onLogout, colors }
             ))}
             <Divider sx={{ my: 1, borderColor: colors.border }} />
             <ListItem 
-              component="div"
+              component="button" type="button"
               onClick={() => {
                 onLogout();
                 navigate('/');

@@ -30,7 +30,7 @@ class ContentFilter:
         'caption', 'transcript', 'landmark', 'heading', 'header', 'footer',
         'alt', 'title', 'label', 'role', 'tabindex', 'skip link', 'error message',
         'form validation', 'region', 'navigation', 'main', 'aside', 'section',
-        'article', 'ul', 'ol', 'li', 'dl', 'table', 'th', 'td', 'scope',
+        'article', 'table', 'scope',
         'aria-live', 'aria-atomic', 'aria-busy', 'aria-controls',
         'aria-current', 'aria-describedby', 'aria-details', 'aria-disabled',
         'aria-dropeffect', 'aria-errormessage', 'aria-flowto', 'aria-grabbed',

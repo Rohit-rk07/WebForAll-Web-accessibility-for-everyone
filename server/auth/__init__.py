@@ -13,6 +13,8 @@ from .auth_models import (
 from .auth_utils import (
     verify_password,
     get_password_hash,
+    verify_password_async,
+    hash_password_async,
     get_user,
     authenticate_user,
     create_access_token,
@@ -34,6 +36,8 @@ __all__ = [
     # Utils
     "verify_password",
     "get_password_hash",
+    "verify_password_async",
+    "hash_password_async",
     "get_user",
     "authenticate_user", 
     "create_access_token",

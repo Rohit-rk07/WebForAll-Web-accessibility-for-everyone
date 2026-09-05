@@ -6,8 +6,8 @@ import json
 
 class WCAGOptions(BaseModel):
     """Options for WCAG version and level selection."""
-    wcag_version: str = "wcag21"
-    level: str = "aa"
+    wcag_version: Literal["wcag2", "wcag21", "wcag22"] = "wcag21"
+    level: Literal["a", "aa", "aaa"] = "aa"
     best_practice: bool = True
 
 class URLAnalysisRequest(BaseModel):

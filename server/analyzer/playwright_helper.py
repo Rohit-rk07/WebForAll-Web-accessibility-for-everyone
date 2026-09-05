@@ -23,6 +23,43 @@ _AXE_SOURCE = None
 _AXE_URL = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js"
 
 
+# Hostname suffixes that can never be globally routable, used to block
+# internal/corporate names even when local DNS maps them to a public-looking
+# address. Defense in depth on top of IP-range checks.
+_HOSTNAME_BLOCK_SUFFIXES = (
+    ".local",
+    ".internal",
+    ".localhost",
+    ".lan",
+    ".home.arpa",
+    ".corp",
+    ".intranet",
+)
+_HOSTNAME_BLOCK_EXACT = {"localhost", "metadata", "metadata.google.internal", "metadata.google"}
+
+
+def _ip_is_global(address: str) -> bool:
+    """Return True only for globally routable addresses.
+
+    IPv4-mapped IPv6 addresses (::ffff:a.b.c.d) are normalized to their IPv4
+    form so private/loopback ranges cannot hide behind the IPv6 wrapper.
+    """
+    ip = ipaddress.ip_address(address)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_unspecified
+
+
+def hostname_is_suspicious(hostname: str) -> bool:
+    """Block internal-corporate and metadata hostnames regardless of resolution."""
+    name = hostname.rstrip(".").lower()
+    if not name:
+        return True
+    if name in _HOSTNAME_BLOCK_EXACT:
+        return True
+    return name.endswith(_HOSTNAME_BLOCK_SUFFIXES)
+
+
 def _hostname_is_public(hostname: str, port: int | None = None) -> bool:
     """Resolve ``hostname`` now and verify every address is globally routable.
 
@@ -31,6 +68,8 @@ def _hostname_is_public(hostname: str, port: int | None = None) -> bool:
     validated, including across redirects.
     """
     hostname = hostname.rstrip(".").lower()
+    if hostname_is_suspicious(hostname):
+        return False
     if not hostname:
         return False
     try:
@@ -42,7 +81,7 @@ def _hostname_is_public(hostname: str, port: int | None = None) -> bool:
             ip = ipaddress.ip_address(address)
         except ValueError:
             return False
-        if not ip.is_global:
+        if not _ip_is_global(str(address)):
             return False
     return True
 
@@ -241,7 +280,7 @@ async def run_analysis(data: Dict[str, Any]):
                 await page.add_script_tag(content=axe_source)
             else:
                 await page.add_script_tag(url=_AXE_URL)
-            await page.wait_for_function("typeof axe !== 'undefined'")
+            await page.wait_for_function("typeof axe !== 'undefined'", timeout=10000)
 
             logger.info(f"Running axe analysis with tags: {tags}")
             results = await page.evaluate(

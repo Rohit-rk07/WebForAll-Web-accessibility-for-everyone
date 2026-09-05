@@ -182,6 +182,7 @@ const FileUploadTab = ({
             </Typography>
             <IconButton 
               size="small" 
+              aria-label="Remove selected file"
               onClick={(e) => {
                 e.stopPropagation();
                 clearFile();

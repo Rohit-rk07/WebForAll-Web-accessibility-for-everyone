@@ -95,19 +95,24 @@ class CacheService:
 cache_service = CacheService(default_ttl=3600)  # 1 hour default TTL
 
 # AI-specific caching functions
-def get_ai_explanation_cache_key(issue_id: str, issue_data: Dict[str, Any]) -> str:
-    """Generate cache key for AI issue explanations."""
+def get_ai_explanation_cache_key(issue_id: str, issue_data: Dict[str, Any], user_scope: str = "") -> str:
+    """Generate cache key for AI issue explanations.
+
+    ``user_scope`` (e.g. a user identifier hash) keeps one user's private scan
+    data out of another user's cache entries.
+    """
     return cache_service._generate_key("ai_explanation", {
         'issue_id': issue_id,
-        'issue_data': issue_data
+        'issue_data': issue_data,
+        'user_scope': user_scope
     })
 
-def cache_ai_explanation(issue_id: str, issue_data: Dict[str, Any], explanation: Dict[str, Any], ttl: int = 7200) -> None:
+def cache_ai_explanation(issue_id: str, issue_data: Dict[str, Any], explanation: Dict[str, Any], user_scope: str = "", ttl: int = 7200) -> None:
     """Cache AI explanation with 2-hour TTL."""
-    cache_key = get_ai_explanation_cache_key(issue_id, issue_data)
+    cache_key = get_ai_explanation_cache_key(issue_id, issue_data, user_scope)
     cache_service.set(cache_key, explanation, ttl=ttl)
 
-def get_cached_ai_explanation(issue_id: str, issue_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def get_cached_ai_explanation(issue_id: str, issue_data: Dict[str, Any], user_scope: str = "") -> Optional[Dict[str, Any]]:
     """Get cached AI explanation if available."""
-    cache_key = get_ai_explanation_cache_key(issue_id, issue_data)
+    cache_key = get_ai_explanation_cache_key(issue_id, issue_data, user_scope)
     return cache_service.get(cache_key)
