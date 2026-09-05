@@ -252,6 +252,8 @@ async def run_analysis(data: Dict[str, Any]):
             logger.info("Creating browser context...")
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 720},
+                bypass_csp=True,
+
             )
             page = await context.new_page()
 
@@ -265,7 +267,6 @@ async def run_analysis(data: Dict[str, Any]):
                 url,
                 wait_until="domcontentloaded",
                 timeout=45000,
-                max_redirects=5,
             )
 
             logger.info("Waiting for page to settle...")

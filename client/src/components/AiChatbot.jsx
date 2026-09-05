@@ -8,9 +8,18 @@ import {
   TextField,
   CircularProgress,
   Tooltip,
+  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { SmartToy, Close, Send, Minimize, Maximize } from "@mui/icons-material";
+import {
+  SmartToy,
+  Close,
+  Send,
+  Minimize,
+  Maximize,
+  ErrorOutline,
+  Refresh,
+} from "@mui/icons-material";
 import aiService from "../services/aiService";
 
 /**
@@ -26,6 +35,66 @@ const AiChatbot = React.memo(() => {
   const [chatWidth, setChatWidth] = useState(350);
   const messagesRef = useRef(messages);
   const inputRef = useRef(null);
+  const toggleRef = useRef(null);
+  const lastUserMessageRef = useRef(null);
+
+  /**
+   * Sends a user message through the AI service and appends the reply.
+   * Reused by the send flow, the context-message entry point, and retry.
+   */
+  const sendMessage = (text) => {
+    const trimmed = (text || "").trim();
+    if (!trimmed || isLoading) return;
+
+    lastUserMessageRef.current = trimmed;
+
+    // Retry case: the last exchange ended in an error from the same prompt.
+    // Drop the stale error bubble instead of duplicating the user message.
+    const prior = messagesRef.current;
+    const canRetry =
+      prior.length >= 2 &&
+      prior[prior.length - 1].isError === true &&
+      prior[prior.length - 2].role === "user" &&
+      prior[prior.length - 2].content === trimmed;
+
+    let working = prior;
+    if (canRetry) {
+      setMessages((prev) => prev.filter((_, i) => i !== prev.length - 1));
+      working = prior.slice(0, -1);
+    } else {
+      const userMessage = { role: "user", content: trimmed };
+      setMessages((prev) => [...prev, userMessage]);
+      working = [...prior, userMessage];
+    }
+
+    setInput("");
+    setIsLoading(true);
+
+    aiService
+      .sendChatMessage(working)
+      .then((response) => {
+        const assistantMessage = {
+          role: "assistant",
+          content: response.content,
+          isError: false,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      })
+      .catch((error) => {
+        console.error("Error sending chat message:", error);
+        const errorMessage = {
+          role: "assistant",
+          content:
+            error.message ||
+            "I'm having trouble reaching the AI service right now. Check your connection and try again.",
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -36,24 +105,25 @@ const AiChatbot = React.memo(() => {
     window.aiChatbot = {
       open: () => setIsOpen(true),
       addContextMessage: async (message) => {
-        const userMessage = {
-          role: "user",
-          content: message,
-        };
-
-        // Add user message first
-        setMessages((prev) => [...prev, userMessage]);
+        const trimmed = (message || "").trim();
+        if (!trimmed) return;
+        // Add user message and open the panel
+        lastUserMessageRef.current = trimmed;
+        setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
         setIsOpen(true);
         setIsLoading(true);
 
         try {
-          // Send message with current messages + new user message
-          const currentMessages = [...messagesRef.current, userMessage];
+          const currentMessages = [
+            ...messagesRef.current,
+            { role: "user", content: trimmed },
+          ];
           const response = await aiService.sendChatMessage(currentMessages);
 
           const assistantMessage = {
             role: "assistant",
             content: response.content,
+            isError: false,
           };
 
           setMessages((prev) => [...prev, assistantMessage]);
@@ -63,7 +133,8 @@ const AiChatbot = React.memo(() => {
             role: "assistant",
             content:
               error.message ||
-              `I'm currently experiencing technical difficulties. Please try again later.`,
+              "I'm having trouble reaching the AI service right now. Check your connection and try again.",
+            isError: true,
           };
           setMessages((prev) => [...prev, errorMessage]);
         } finally {
@@ -102,36 +173,7 @@ const AiChatbot = React.memo(() => {
    */
   const handleSend = () => {
     if (!input.trim() || isLoading) return;
-
-    // Add user message
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-
-    // Call AI service
-    aiService
-      .sendChatMessage([...messages, userMessage])
-      .then((response) => {
-        const assistantMessage = {
-          role: "assistant",
-          content: response.content,
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      })
-      .catch((error) => {
-        console.error("Error sending chat message:", error);
-        const errorMessage = {
-          role: "assistant",
-          content:
-            error.message ||
-            `I'm currently experiencing technical difficulties with my AI service. This might be due to API limits or connectivity issues. You can still use the accessibility analyzer features, but some AI capabilities may be limited. Please try again later.`,
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    sendMessage(input);
   };
 
   /**
@@ -144,9 +186,13 @@ const AiChatbot = React.memo(() => {
     }
   };
 
-  // Close the panel with Escape and move focus when it opens/closes
+  // Close the panel with Escape and manage focus when it opens/closes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Return focus to the toggle so keyboard users know where they are
+      toggleRef.current?.focus();
+      return;
+    }
     const onKeyDown = (e) => {
       if (e.key === "Escape") toggleChat();
     };
@@ -168,9 +214,11 @@ const AiChatbot = React.memo(() => {
       >
         <Tooltip title={isOpen ? "Close AI Assistant" : "Ask AI Assistant"}>
           <Button
+            ref={toggleRef}
             variant="contained"
             color="primary"
             aria-label={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
+            aria-expanded={isOpen}
             onClick={toggleChat}
             sx={{
               borderRadius: "50%",
@@ -186,6 +234,8 @@ const AiChatbot = React.memo(() => {
 
       {/* Chat Panel */}
       <Box
+        role={isOpen ? "dialog" : undefined}
+        aria-label="AI Assistant"
         sx={{
           position: "fixed",
           top: 64,
@@ -273,19 +323,27 @@ const AiChatbot = React.memo(() => {
                   p: 1.5,
                   borderRadius: 2,
                   maxWidth: "85%",
-                  bgcolor:
-                    message.role === "user"
+                  bgcolor: message.isError
+                    ? theme.palette.mode === "dark"
+                      ? "rgba(211, 47, 47, 0.18)"
+                      : "#fdecea"
+                    : message.role === "user"
                       ? "primary.main"
                       : theme.palette.mode === "dark"
                         ? "grey.800"
                         : "#ffffff",
-                  color:
-                    message.role === "user"
+                  color: message.isError
+                    ? theme.palette.text.primary
+                    : message.role === "user"
                       ? "white"
                       : theme.palette.mode === "dark"
                         ? "grey.100"
                         : "#000000",
-                  border: message.role === "assistant" ? `2px solid` : "none",
+                  border: message.isError
+                    ? `1px solid ${theme.palette.error.main}`
+                    : message.role === "assistant"
+                      ? `2px solid`
+                      : "none",
                   borderColor:
                     theme.palette.mode === "dark" ? "grey.700" : "#e0e0e0",
                   boxShadow:
@@ -294,6 +352,27 @@ const AiChatbot = React.memo(() => {
                       : "none",
                 }}
               >
+                {message.isError ? (
+                  <Alert
+                    severity="error"
+                    icon={<ErrorOutline fontSize="small" />}
+                    sx={{ p: 0, pb: 1.25, wordBreak: "break-word" }}
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<Refresh />}
+                        onClick={() => sendMessage(lastUserMessageRef.current)}
+                        disabled={isLoading}
+                        aria-label="Retry sending your message"
+                      >
+                        Retry
+                      </Button>
+                    }
+                  >
+                    {message.content}
+                  </Alert>
+                ) : (
                 <Box>
                   {message.content.split("```").map((part, i) => {
                     if (i % 2 === 0) {
@@ -373,6 +452,7 @@ const AiChatbot = React.memo(() => {
                     }
                   })}
                 </Box>
+                )}
               </Paper>
             </Box>
           ))}

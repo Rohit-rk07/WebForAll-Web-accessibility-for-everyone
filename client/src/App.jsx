@@ -7,16 +7,12 @@ import {
   Navigate,
   Outlet,
 } from "react-router-dom";
-import {
-  ThemeProvider as MuiThemeProvider,
-  createTheme,
-  CssBaseline,
-  Box,
-} from "@mui/material";
+import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from "@mui/material";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useThemeMode } from "./contexts/useThemeMode";
 import { useAuth } from "./contexts/useAuth";
+import { createAppTheme } from "./theme";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PageLoader from "./components/PageLoader";
 import OfflineBanner from "./components/OfflineBanner";
@@ -85,86 +81,7 @@ const ProtectedRoute = () => {
  */
 function AppContent() {
   const { darkMode } = useThemeMode();
-  const theme = createTheme({
-    palette: {
-      mode: darkMode ? "dark" : "light",
-      primary: {
-        main: "#4361ee",
-        light: "#738eef",
-        dark: "#2f4bc7",
-        contrastText: "#ffffff",
-      },
-      secondary: {
-        main: "#3a0ca3",
-        light: "#5e3db8",
-        dark: "#2a0875",
-        contrastText: "#ffffff",
-      },
-      background: {
-        default: darkMode ? "#181a1b" : "#f8f9fa",
-        paper: darkMode ? "#23272f" : "#ffffff",
-      },
-    },
-    typography: {
-      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-      h1: { fontWeight: 700 },
-      h2: { fontWeight: 700 },
-      h3: { fontWeight: 600 },
-      h4: { fontWeight: 600 },
-      h5: { fontWeight: 500 },
-      h6: { fontWeight: 500 },
-      button: { fontWeight: 500, textTransform: "none" },
-    },
-    shape: { borderRadius: 8 },
-    components: {
-      MuiButton: {
-        defaultProps: { disableElevation: true },
-        styleOverrides: {
-          root: {
-            minHeight: 44,
-            boxShadow: "none",
-            "&:hover": { boxShadow: "none" },
-          },
-        },
-      },
-      MuiIconButton: {
-        styleOverrides: {
-          root: {
-            minWidth: 44,
-            minHeight: 44,
-          },
-        },
-      },
-      MuiPaper: {
-        styleOverrides: {
-          root: { boxShadow: "0px 1px 4px rgba(0, 0, 0, 0.08)" },
-        },
-      },
-      MuiCssBaseline: {
-        styleOverrides: {
-          body: {
-            backgroundColor: darkMode ? "#181a1b" : "#f4f6fb",
-            minHeight: "100vh",
-            width: "100%",
-            overflowWrap: "anywhere",
-          },
-          "*:focus-visible": {
-            outline: `3px solid ${darkMode ? "#8aa4ff" : "#2f4bc7"}`,
-            outlineOffset: "2px",
-          },
-          "@media (prefers-reduced-motion: reduce)": {
-            "html": { scrollBehavior: "auto" },
-            "*, *::before, *::after": {
-              animationDuration: "0.01ms !important",
-              animationIterationCount: "1 !important",
-              transitionDuration: "0.01ms !important",
-              scrollBehavior: "auto !important",
-            },
-          },
-        },
-      },
-    },
-  });
+  const theme = createAppTheme(darkMode);
   return (
     <MuiThemeProvider theme={theme}>
       <CssBaseline />

@@ -19,7 +19,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  CircularProgress,
   Alert,
   TablePagination,
 } from "@mui/material";
@@ -35,6 +34,9 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { apiDelete, apiJson } from "../services/apiClient";
 import { getUserFacingError } from "../utils/userFacingError";
+import PageHeader from "../components/ui/PageHeader";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorPanel from "../components/ui/ErrorPanel";
 
 const PAGE_SIZE = 10;
 
@@ -155,23 +157,12 @@ const History = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 1, md: 3 }, maxWidth: 1200, mx: "auto" }}>
-      <Paper
-        elevation={0}
-        sx={{
-          p: 3,
-          mb: 3,
-          bgcolor: "background.paper",
-          border: `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-          Analysis History
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Search, sort, open, or delete previous scans.
-        </Typography>
-      </Paper>
+    <Box>
+      <PageHeader
+        label="Reports"
+        title="Analysis history"
+        subtitle="Search, sort, and open previous scans. Deleted reports cannot be recovered."
+      />
 
       <Box
         sx={{
@@ -208,6 +199,7 @@ const History = () => {
             onClick={() => handleSort("name")}
             size="small"
             aria-pressed={sortField === "name"}
+            sx={{ px: 2 }}
           >
             Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
@@ -218,6 +210,7 @@ const History = () => {
             onClick={() => handleSort("date")}
             size="small"
             aria-pressed={sortField === "date"}
+            sx={{ px: 2 }}
           >
             Date {sortField === "date" && (sortDirection === "asc" ? "↑" : "↓")}
           </Button>
@@ -228,6 +221,7 @@ const History = () => {
             onClick={() => handleSort("violations")}
             size="small"
             aria-pressed={sortField === "violations"}
+            sx={{ px: 2 }}
           >
             Violations{" "}
             {sortField === "violations" &&
@@ -237,33 +231,33 @@ const History = () => {
       </Box>
 
       {loading ? (
-        <Box
-          sx={{ display: "flex", justifyContent: "center", py: 8 }}
-          role="status"
-        >
-          <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Loading history...</Typography>
-        </Box>
+        <Paper elevation={0} sx={{ borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
+          <LoadingState label="Loading history…" />
+        </Paper>
       ) : loadError ? (
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={fetchHistory}>
-              Retry
-            </Button>
-          }
-          sx={{ wordBreak: "break-word" }}
-        >
-          {loadError}
-        </Alert>
+        <ErrorPanel title="Couldn't load history" body={loadError} onRetry={fetchHistory} />
       ) : (
         <TableContainer
           component={Paper}
-          sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}` }}
+          elevation={0}
+          sx={{
+            borderRadius: 1,
+            border: `1px solid ${theme.palette.divider}`,
+            "& .MuiTableRow-root": {
+              transition: "backgroundColor 0.2s ease",
+            },
+          }}
         >
           <Table>
             <TableHead>
-              <TableRow>
+              <TableRow
+                sx={{
+                  "& .MuiTableCell-root": {
+                    backgroundColor: theme.palette.action.hover,
+                    py: 1.5,
+                  },
+                }}
+              >
                 <TableCell>
                   <Typography fontWeight="bold">Website</Typography>
                 </TableCell>

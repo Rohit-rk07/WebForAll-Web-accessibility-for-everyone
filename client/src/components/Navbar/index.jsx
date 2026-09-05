@@ -10,7 +10,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { Menu as MenuIcon, Security, AccountCircle } from "@mui/icons-material";
+import { Menu as MenuIcon, AccessibilityNew, AccountCircle } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/useAuth";
 
@@ -77,9 +77,10 @@ const Navbar = () => {
         position="fixed"
         elevation={0}
         sx={{
-          bgcolor: COLORS.background,
+          bgcolor: "background.paper",
           color: COLORS.text,
           zIndex: theme.zIndex.drawer + 2,
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Toolbar>
@@ -106,12 +107,13 @@ const Navbar = () => {
           >
             <Avatar
               sx={{
-                background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%)`,
+                bgcolor: "primary.main",
                 width: 40,
                 height: 40,
+                borderRadius: 1.5,
               }}
             >
-              <Security />
+              <AccessibilityNew />
             </Avatar>
             <Typography
               variant="h6"

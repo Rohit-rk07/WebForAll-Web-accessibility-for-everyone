@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, Typography, IconButton } from '@mui/material';
+import { Box, Button, Typography, IconButton, FormHelperText } from '@mui/material';
 import { CloudUpload, Delete } from '@mui/icons-material';
 import WCAGOptions from './WCAGOptions';
 import { useTheme } from '@mui/material';
@@ -8,29 +8,25 @@ import { apiForm } from '../../services/apiClient';
 
 // Default WCAG options
 const DEFAULT_WCAG_OPTIONS = {
-  wcag_version: "wcag21",  // WCAG 2.1
-  level: "aa",             // Level AA
-  best_practice: true      // Include best practices
+  wcag_version: "wcag21",
+  level: "aa",
+  best_practice: true
 };
+
+const ACCEPTED_EXTENSIONS = ['.html', '.htm'];
+
+const hasAcceptedExtension = (name = '') =>
+  ACCEPTED_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
 
 /**
  * FileUploadTab component for analyzing HTML files
- * 
- * @param {Object} props - Component props
- * @param {Function} props.onAnalyze - Callback function to handle analysis
- * @param {Function} props.setIsLoading - Function to set loading state
- * @param {boolean} props.isLoading - Current loading state
- * @param {Object} props.colors - Color scheme
- * @param {Function} props.onError - Function to handle errors
- * @param {Function} props.clearError - Function to clear errors
- * @returns {JSX.Element} The file upload tab component
  */
-const FileUploadTab = ({ 
-  onAnalyze, 
-  setIsLoading, 
-  isLoading, 
-  onError = () => {}, 
-  clearError = () => {} 
+const FileUploadTab = ({
+  onAnalyze,
+  setIsLoading,
+  isLoading,
+  onError = () => {},
+  clearError = () => {}
 }) => {
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -39,80 +35,78 @@ const FileUploadTab = ({
 
   const theme = useTheme();
   const navigate = useNavigate();
-  
-  // Update COLORS to use theme values
+
   const COLORS = {
     primary: theme.palette.primary.main,
-    secondary: theme.palette.secondary.main,
     background: theme.palette.background.paper,
     border: theme.palette.divider,
     text: theme.palette.text.primary,
     lightText: theme.palette.text.secondary,
     hover: theme.palette.action.hover
   };
+
+  const chooseFile = (candidate) => {
+    if (!candidate) return;
+    if (!hasAcceptedExtension(candidate.name)) {
+      setLocalError('Only .html and .htm files are supported.');
+      setFile(null);
+      clearError();
+      return;
+    }
+    setFile(candidate);
+    setLocalError(null);
+    clearError();
+  };
+
+  const openFilePicker = () => {
+    document.getElementById('file-input')?.click();
+  };
+
   /**
    * Handles file selection from input
-   * @param {Event} e - File input change event
    */
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setLocalError(null);
-      clearError();
+      chooseFile(e.target.files[0]);
     }
   };
 
   /**
    * Handles file drop event
-   * @param {Event} e - Drop event
    */
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setLocalError(null);
-      clearError();
+      chooseFile(e.dataTransfer.files[0]);
     }
   };
 
-  /**
-   * Handles drag events
-   * @param {Event} e - Drag event
-   * @param {boolean} isActive - Whether drag is active
-   */
   const handleDrag = (e, isActive) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(isActive);
   };
 
-  /**
-   * Clears the selected file
-   */
   const clearFile = () => {
     setFile(null);
     setLocalError(null);
     clearError();
   };
 
-  /**
-   * Submits file for analysis
-   */
   const handleSubmit = async () => {
     if (!file) return;
-    
+
     setIsLoading(true);
     setLocalError(null);
     clearError();
-    
+
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('wcag_options', JSON.stringify(wcagOptions));
-      
+
       const result = await apiForm('/analyze/file', formData);
 
       if (result && result.id) {
@@ -130,37 +124,51 @@ const FileUploadTab = ({
   };
 
   return (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        gap: 2
+        gap: 1.5,
+        py: 1,
+        px: { xs: 1.5, sm: 2.5 },
       }}
     >
-      <Box 
-        sx={{ 
-          border: '2px dashed',
-          borderColor: dragActive ? COLORS.primary : COLORS.border,
-          borderRadius: 2,
-          p: 4,
-          width: '100%',
-          textAlign: 'center',
-          bgcolor: dragActive ? 'rgba(67, 97, 238, 0.05)' : COLORS.background,
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          minHeight: 200,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          position: 'relative'
+      <Box
+        role="button"
+        tabIndex={0}
+        aria-label={file ? `Selected file: ${file.name}. Choose a different file.` : 'Choose an HTML file to upload'}
+        onClick={openFilePicker}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+          }
         }}
         onDragOver={(e) => handleDrag(e, true)}
         onDragEnter={(e) => handleDrag(e, true)}
         onDragLeave={(e) => handleDrag(e, false)}
         onDrop={handleDrop}
-        onClick={() => document.getElementById('file-input').click()}
+        sx={{
+          border: '2px dashed',
+          borderColor: dragActive ? COLORS.primary : COLORS.border,
+          borderRadius: 1,
+          p: 4,
+          width: '100%',
+          textAlign: 'center',
+          bgcolor: dragActive ? 'action.selected' : COLORS.background,
+          cursor: 'pointer',
+          transition: 'border-color 150ms ease, background-color 150ms ease',
+          minHeight: 200,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          '&:focus-visible': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: 2,
+          },
+        }}
       >
         <input
           id="file-input"
@@ -169,31 +177,29 @@ const FileUploadTab = ({
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
-        
-        <CloudUpload sx={{ fontSize: 60, color: COLORS.primary, mb: 2 }} />
-        
+
+        <CloudUpload sx={{ fontSize: 44, color: COLORS.lightText, mb: 1.5 }} aria-hidden="true" />
+
         {file ? (
           <>
-            <Typography variant="body1" fontWeight="medium" color={COLORS.text}>
+            <Typography variant="body1" fontWeight={600} color={COLORS.text}>
               {file.name}
             </Typography>
             <Typography variant="body2" color={COLORS.lightText}>
-              {(file.size / 1024).toFixed(2)} KB
+              {(file.size / 1024).toFixed(2)} KB · click to replace
             </Typography>
-            <IconButton 
-              size="small" 
+            <IconButton
+              size="small"
               aria-label="Remove selected file"
               onClick={(e) => {
                 e.stopPropagation();
                 clearFile();
               }}
-              sx={{ 
+              sx={{
                 position: 'absolute',
                 top: 8,
                 right: 8,
-                bgcolor: COLORS.background,
-                '&:hover': { bgcolor: COLORS.hover }
-
+                '&:hover': { bgcolor: COLORS.hover },
               }}
             >
               <Delete fontSize="small" />
@@ -201,51 +207,39 @@ const FileUploadTab = ({
           </>
         ) : (
           <>
-            <Typography variant="h6" fontWeight="medium" color={COLORS.text}>
-              Drag & Drop HTML File
+            <Typography variant="h4" fontWeight={600} color={COLORS.text}>
+              Drop an HTML file
             </Typography>
-            <Typography variant="body2" color={COLORS.lightText} sx={{ mt: 1 }}>
-              or click to browse files
+            <Typography variant="body2" color={COLORS.lightText} sx={{ mt: 0.5 }}>
+              or click to browse — .html, .htm up to 2 MB
             </Typography>
           </>
         )}
       </Box>
-      
-      <WCAGOptions 
+
+      {localError && (
+        <FormHelperText error id="file-error">
+          {localError}
+        </FormHelperText>
+      )}
+
+      <WCAGOptions
         options={wcagOptions}
         onChange={setWcagOptions}
         colors={COLORS}
       />
-      
-      {localError && (
-        <Typography 
-          variant="body2" 
-          color="error" 
-          sx={{ textAlign: 'center', width: '100%' }}
-        >
-          {localError}
-        </Typography>
-      )}
-      
-      <Button 
-        variant="contained" 
+
+      <Button
+        variant="contained"
         onClick={handleSubmit}
         disabled={!file || isLoading}
         fullWidth
-        sx={{ 
-          py: 1.5, 
-          mt: 2,
-          borderRadius: 2,
-          bgcolor: COLORS.primary,
-          '&:hover': {
-            bgcolor: COLORS.secondary,
-          }
-        }}
+        sx={{ py: 1.5, mt: 1 }}
       >
-        {isLoading ? 'Analyzing...' : 'Analyze Accessibility'}
+        {isLoading ? 'Analyzing…' : 'Analyze Accessibility'}
       </Button>
     </Box>
   );
 };
 
-export default FileUploadTab; 
+export default FileUploadTab;

@@ -66,7 +66,7 @@ class ErrorBoundary extends Component {
               severity="error"
               sx={{
                 mb: 3,
-                borderRadius: 2,
+                borderRadius: 1,
                 alignItems: "center",
               }}
             >

@@ -128,6 +128,9 @@ Dockerfile.prod
 *.backup
 *.old
 
+# Local MongoDB backup archives
+server/backups/
+
 # Test files
 test-results/
 playwright-report/

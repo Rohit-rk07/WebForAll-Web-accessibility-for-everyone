@@ -23,11 +23,6 @@ const DashboardLayout = () => {
     }
   }, [isLoggedIn, navigate]);
 
-  // Theme-based colors
-  const COLORS = {
-    background: theme.palette.background.default,
-  };
-
   // If not logged in, don't render the dashboard
   if (!isLoggedIn) {
     return null;
@@ -43,15 +38,23 @@ const DashboardLayout = () => {
         id="main-content"
         component="main"
         sx={{
-          p: 3,
+          p: { xs: 2, md: 3 },
           marginTop: "64px",
-          background: COLORS.background,
+          background: theme.palette.background.default,
           minHeight: "calc(100vh - 64px)",
           overflow: "auto",
         }}
         tabIndex={-1} // Allow focus but don't show outline
       >
-        <Outlet />
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: 1120,
+            mx: "auto",
+          }}
+        >
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

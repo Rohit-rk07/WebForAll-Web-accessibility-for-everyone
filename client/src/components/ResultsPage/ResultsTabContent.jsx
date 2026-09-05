@@ -21,6 +21,7 @@ import {
   HelpOutline,
   Block,
 } from "@mui/icons-material";
+import { CircularProgress } from "@mui/material";
 
 /**
  * ResultsTabContent Component
@@ -238,7 +239,13 @@ const ResultsTabContent = ({
                 </Box>
                 <Button
                   component="span"
-                  startIcon={<SmartToy />}
+                  startIcon={
+                    needsReviewLoading[index] ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <SmartToy />
+                    )
+                  }
                   variant="outlined"
                   color="warning"
                   size="small"
@@ -247,9 +254,10 @@ const ResultsTabContent = ({
                     onNeedsReview(issue, index);
                   }}
                   disabled={needsReviewLoading[index]}
+                  aria-label={needsReviewLoading[index] ? "Loading AI review" : `Get AI review for ${issue.id || "this issue"}`}
                   sx={{ ml: "auto" }}
                 >
-                  {needsReviewLoading[index] ? "Loading..." : "Needs Review"}
+                  {needsReviewLoading[index] ? "Checking..." : "AI Check"}
                 </Button>
               </Box>
             </AccordionSummary>

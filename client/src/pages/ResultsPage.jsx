@@ -8,22 +8,17 @@ import React, {
   useCallback,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  CircularProgress,
-  IconButton,
-  Alert,
-} from "@mui/material";
-import { ArrowBack, Download } from "@mui/icons-material";
+import { Box, Button, Typography } from "@mui/material";
+import { Download } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 
 // Import our modular components
 import ScoreCard from "../components/ResultsPage/ScoreCard";
 import ResultsTabs from "../components/ResultsPage/ResultsTabs";
 import ResultsContent from "../components/ResultsPage/ResultsContent";
+import PageHeader from "../components/ui/PageHeader";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorPanel from "../components/ui/ErrorPanel";
 const ExportDialog = lazy(
   () => import("../components/ResultsPage/ExportDialog"),
 );
@@ -50,6 +45,7 @@ const ResultsPage = () => {
   const resultsRef = useRef(null);
   const [analyzedUrl, setAnalyzedUrl] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   const { id } = useParams();
 
@@ -75,7 +71,7 @@ const ResultsPage = () => {
       }
     };
     loadById();
-  }, [id, navigate]);
+  }, [id, navigate, reloadKey]);
 
   const scoreData = useMemo(
     () => calculateAccessibilityScore(result),
@@ -88,8 +84,6 @@ const ResultsPage = () => {
 
   /**
    * Handle tab change
-   * @param {Event} event - Change event
-   * @param {number} newValue - New tab index
    */
   const handleTabChange = useCallback((event, newValue) => {
     setActiveTab(newValue);
@@ -117,101 +111,56 @@ const ResultsPage = () => {
   }, [navigate]);
 
   if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "60vh",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-        <CircularProgress size={60} />
-        <Typography variant="h6" color="text.secondary">
-          Loading Results...
-        </Typography>
-      </Box>
-    );
+    return <LoadingState label="Loading results…" />;
   }
 
   if (!result) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "60vh",
-          flexDirection: "column",
-          gap: 2,
+      <ErrorPanel
+        title="No report found"
+        body={loadError || "No results found"}
+        onRetry={() => {
+          setLoading(true);
+          setLoadError("");
+          setReloadKey((k) => k + 1);
         }}
-      >
-        <Alert severity="error" sx={{ wordBreak: "break-word" }}>
-          {loadError || "No results found"}
-        </Alert>
-        <Button variant="contained" onClick={handleBackClick}>
-          Back to Dashboard
-        </Button>
-      </Box>
+      />
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>
-      {/* Header */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          mb: 3,
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          alignItems: { xs: "flex-start", sm: "center" },
-          justifyContent: "space-between",
-          gap: 2,
-          border: `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, minWidth: 0 }}>
-          <IconButton
-            onClick={handleBackClick}
-            color="primary"
-            aria-label="Back to dashboard"
-          >
-            <ArrowBack />
-          </IconButton>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: "bold" }}>
-              Accessibility Analysis Results
-            </Typography>
-            {analyzedUrl && (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.5, wordBreak: "break-all" }}
+    <Box>
+      <PageHeader
+        label="Reports"
+        title="Analysis results"
+        subtitle={
+          analyzedUrl ? (
+            <>
+              <strong>Analyzed URL:</strong>{" "}
+              <a
+                href={analyzedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ wordBreak: "break-all", color: theme.palette.primary.main }}
               >
-                <strong>Analyzed URL:</strong>{" "}
-                <a
-                  href={analyzedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {analyzedUrl}
-                </a>
-              </Typography>
-            )}
-          </Box>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<Download />}
-          onClick={handleExportClick}
-        >
-          Export Results
-        </Button>
-      </Paper>
+                {analyzedUrl}
+              </a>
+            </>
+          ) : (
+            "Full WCAG report grouped by severity"
+          )
+        }
+        onBack={handleBackClick}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Download />}
+            onClick={handleExportClick}
+          >
+            Export
+          </Button>
+        }
+      />
 
       {/* Main Content */}
       <Box ref={resultsRef}>

@@ -7,7 +7,12 @@ import {
   Button,
   Alert,
   Paper,
+  Avatar,
+  Link as MuiLink,
+  useTheme,
 } from "@mui/material";
+import { AccessibilityNew, ArrowBack } from "@mui/icons-material";
+import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
 
 export default function ForgotPassword() {
@@ -17,6 +22,7 @@ export default function ForgotPassword() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [cooldownLeft, setCooldownLeft] = useState(0); // seconds
+  const theme = useTheme();
 
   // Decrement cooldown every second
   useEffect(() => {
@@ -48,60 +54,109 @@ export default function ForgotPassword() {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h5" fontWeight={700} gutterBottom>
-          Forgot Password
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          Enter your account email. If it exists, we will send a password reset
-          link.
-        </Typography>
-        <Box component="form" onSubmit={onSubmit} sx={{ mt: 2 }}>
-          {message && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {message}
-            </Alert>
-          )}
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <TextField
-            type="email"
-            label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            fullWidth
-            required
-            margin="normal"
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={loading || cooldownLeft > 0}
-            fullWidth
-            sx={{ mt: 1 }}
-          >
-            {loading
-              ? "Sending…"
-              : cooldownLeft > 0
-                ? `Send Again in ${String(Math.floor(cooldownLeft / 60)).padStart(1, "0")}:${String(cooldownLeft % 60).padStart(2, "0")}`
-                : "Send Reset Link"}
-          </Button>
-          {cooldownLeft > 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-              sx={{ mt: 1, textAlign: "center" }}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        py: { xs: 4, md: 8 },
+      }}
+    >
+      <Container maxWidth="sm">
+        <MuiLink
+          component={Link}
+          to="/"
+          underline="hover"
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.75, mb: 3, color: "text.secondary" }}
+        >
+          <ArrowBack fontSize="small" aria-hidden="true" />
+          Back to home
+        </MuiLink>
+
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 3, md: 5 },
+            borderRadius: 1,
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
+            <Avatar
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+              }}
             >
-              You can request another reset email after the cooldown.
+              <AccessibilityNew fontSize="small" />
+            </Avatar>
+            <Typography variant="h5" component="span" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
+              Accessibility Analyzer
             </Typography>
-          )}
-        </Box>
-      </Paper>
-    </Container>
+          </Box>
+
+          <Typography variant="h3" component="h1" sx={{ fontWeight: 700, mb: 1, letterSpacing: "-0.02em" }}>
+            Reset your password
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Enter your account email. If it exists, we will send a password
+            reset link.
+          </Typography>
+
+          <Box component="form" onSubmit={onSubmit} sx={{ mt: 2 }}>
+            {message && (
+              <Alert severity="success" sx={{ mb: 2, wordBreak: "break-word" }}>
+                {message}
+              </Alert>
+            )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, wordBreak: "break-word" }}>
+                {error}
+              </Alert>
+            )}
+            <TextField
+              type="email"
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              fullWidth
+              required
+              autoComplete="email"
+              margin="normal"
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || cooldownLeft > 0}
+              fullWidth
+              sx={{ mt: 2, py: 1.5 }}
+            >
+              {loading
+                ? "Sending…"
+                : cooldownLeft > 0
+                  ? `Send Again in ${String(Math.floor(cooldownLeft / 60)).padStart(1, "0")}:${String(cooldownLeft % 60).padStart(2, "0")}`
+                  : "Send Reset Link"}
+            </Button>
+            {cooldownLeft > 0 && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                display="block"
+                sx={{ mt: 1, textAlign: "center" }}
+              >
+                You can request another reset email after the cooldown.
+              </Typography>
+            )}
+          </Box>
+        </Paper>
+      </Container>
+    </Box>
   );
 }

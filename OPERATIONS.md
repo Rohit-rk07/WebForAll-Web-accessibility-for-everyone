@@ -21,8 +21,7 @@ All optional unless marked required:
 | Variable | Default | Purpose |
 |---|---|---|
 | `MONGODB_URI` | — (required) | Atlas connection string with database |
-| `MONGODB_DB_NAME` | `accessibility-analyzer` | Database name |
-| `SECRET_KEY` | — (required) | JWT signing secret (32+ random chars) |
+| `MONGODB_DB_NAME` | `accessibility-analyzer` | Database name || `SECRET_KEY` | — (required) | JWT signing secret (32+ random chars) |
 | `CSRF_SECRET` | — (required) | CSRF token signing secret |
 | `GEMINI_API_KEY` | — | Enables AI chat/explain; endpoints 503 without it |
 | `JWT_ISSUER` / `JWT_AUDIENCE` | `accessibility-analyzer` | Token claims validation |
@@ -54,21 +53,46 @@ Run backend + client suites in CI on every push before deploy.
 
 ## Backup & Restore
 
-The database (`MongoDB Atlas`) holds users, analyses, and password-reset tokens. Only `analyses` and `users` matter operationally.
+The database (`MongoDB`) holds users, analyses, and password-reset tokens. Only `analyses` and `users` matter operationally. It is served by a **local `mongod`** (db name `accessibility-analyzer`, configured via `MONGODB_URI`/`MONGODB_DB_NAME`).
+
+Three scripts in `server/scripts/` provide logical backup, restore, and retention — pure Python using pymongo (already a dependency via motor), so no `mongodump` install is required. Run them from `server/`. They load `MONGODB_URI`/`MONGODB_DB_NAME` from `server/.env`.
 
 ### Backup
-- Schedule Atlas **Continuous Cloud Backups** or automated snapshots (recommended interval: daily, PITR enabled).
-- For a quick manual dump:
-  ```bash
-  mongodump --uri "$MONGODB_URI" --db accessibility-analyzer --archive=backup-$(date +%F).archive
-  ```
-- Store archives off-site (object storage) with encryption at rest.
+```bash
+# writes server/backups/backup-<date>-accessibility-analyzer.json.gz; keeps last 30
+python scripts/backup_db.py
+# customize location / retention
+python scripts/backup_db.py --out D:\mongo-backups --keep 14
+```
+- Each run produces one gzip archive (`<collection><tab><json>` per line). Archives are git-ignored (`server/backups/`).
+- Keep local archives and copy them off-machine for durability.
 
 ### Restore
 ```bash
-mongorestore --uri "$MONGODB_URI" --db accessibility-analyzer --archive=backup-YYYY-MM-DD.archive
+# safe merge: skips documents whose _id already exists
+python scripts/restore_db.py backups/backup-YYYY-MM-DD_HHMMSS-accessibility-analyzer.json.gz
+# full replace: drops the affected collections first
+python scripts/restore_db.py backups/backup-YYYY-MM-DD_HHMMSS-accessibility-analyzer.json.gz --drop
 ```
-Verify after restore: `GET /health`, a demo login, and `GET /history` for a known user. Restore drops/overwrites targeted collections only; never restore a backup from an untrusted source.
+- Indexes are not restored; the app recreates them on startup (`services.db.init_indexes`).
+- Verify after restore: `GET /health`, a login, and `GET /history` for a known user.
+- Never restore an archive from an untrusted source.
+
+### Retention
+`analyses` auto-purge older than a cutoff (password-reset tokens already auto-expire via their TTL index):
+```bash
+python scripts/retention.py --days 90          # dry-run (default)
+python scripts/retention.py --days 90 --apply  # actually delete
+```
+
+### Scheduling (Windows)
+`server/scripts/schedule.ps1` registers two idempotent Scheduled Tasks — daily backup (02:00, keep 30) and monthly retention (03:00, purge >90 days). Run from an elevated shell:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\schedule.ps1
+# remove them:
+powershell -ExecutionPolicy Bypass -File .\scripts\schedule.ps1 -Uninstall
+```
+Adjust retention with `--days` to match policy before applying.
 
 ## Incident Response
 

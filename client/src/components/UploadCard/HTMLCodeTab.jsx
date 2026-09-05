@@ -1,36 +1,26 @@
 import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Tooltip } from '@mui/material';
-import { HelpOutline } from '@mui/icons-material';
+import { Box, Button, TextField, Typography, FormHelperText } from '@mui/material';
 import WCAGOptions from './WCAGOptions';
 import { useNavigate } from 'react-router-dom';
 import { apiJson } from '../../services/apiClient';
 
 // Default WCAG options
 const DEFAULT_WCAG_OPTIONS = {
-  wcag_version: "wcag21",  // WCAG 2.1
-  level: "aa",             // Level AA
-  best_practice: true      // Include best practices
+  wcag_version: "wcag21",
+  level: "aa",
+  best_practice: true
 };
 
 /**
  * HTMLCodeTab component for analyzing HTML code directly
- * 
- * @param {Object} props - Component props
- * @param {Function} props.onAnalyze - Callback function to handle analysis
- * @param {Function} props.setIsLoading - Function to set loading state
- * @param {boolean} props.isLoading - Current loading state
- * @param {Object} props.colors - Color scheme
- * @param {Function} props.onError - Function to handle errors
- * @param {Function} props.clearError - Function to clear errors
- * @returns {JSX.Element} The HTML code tab component
  */
-const HTMLCodeTab = ({ 
-  onAnalyze, 
-  setIsLoading, 
-  isLoading, 
-  colors, 
-  onError = () => {}, 
-  clearError = () => {} 
+const HTMLCodeTab = ({
+  onAnalyze,
+  setIsLoading,
+  isLoading,
+  colors,
+  onError = () => {},
+  clearError = () => {}
 }) => {
   const [htmlContent, setHtmlContent] = useState('');
   const [localError, setLocalError] = useState(null);
@@ -41,16 +31,16 @@ const HTMLCodeTab = ({
    * Submits HTML content for analysis
    */
   const handleSubmit = async () => {
-    if (!htmlContent) return;
-    
+    if (!htmlContent.trim()) return;
+
     setIsLoading(true);
     setLocalError(null);
     clearError();
-    
+
     try {
       const result = await apiJson('/analyze/html', {
         method: 'POST',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           content: htmlContent,
           wcag_options: wcagOptions
         })
@@ -62,7 +52,7 @@ const HTMLCodeTab = ({
         return;
       }
 
-// Fallback: format locally and pass up
+      // Fallback: format locally and pass up
       const formattedResult = {
         ...result,
         results: result?.results || {},
@@ -83,26 +73,28 @@ const HTMLCodeTab = ({
   };
 
   return (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 2
+        gap: 1.5,
+        py: 1,
+        px: { xs: 1.5, sm: 2.5 },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h6" fontWeight="medium" color={colors.text}>
-          Paste HTML Code
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 600 }}>
+          HTML source
         </Typography>
-        <Tooltip title="Paste HTML code directly for accessibility analysis">
-          <HelpOutline fontSize="small" sx={{ color: colors.lightText }} />
-        </Tooltip>
+        <Typography variant="caption" color={colors.lightText}>
+          Analyze a full page or a snippet of HTML.
+        </Typography>
       </Box>
-      
+
       <TextField
         multiline
         rows={10}
-        placeholder="<html>\n  <body>\n    <h1>Your HTML here</h1>\n  </body>\n</html>"
+        placeholder={"<html>\n  <body>\n    <header>…</header>\n  </body>\n</html>"}
         value={htmlContent}
         onChange={(e) => {
           setHtmlContent(e.target.value);
@@ -111,59 +103,42 @@ const HTMLCodeTab = ({
         }}
         fullWidth
         variant="outlined"
+        inputProps={{ 'aria-label': 'HTML source code', spellCheck: 'false' }}
         InputProps={{
-          sx: { fontFamily: 'monospace' }
+          sx: { fontFamily: "Consolas, Monaco, 'Courier New', monospace", fontSize: '0.85rem' }
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
-            '& fieldset': {
-              borderColor: colors.border,
-            },
-            '&:hover fieldset': {
-              borderColor: colors.primary,
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: colors.primary,
-            },
+            '& fieldset': { borderColor: colors.border },
+            '&:hover fieldset': { borderColor: colors.border },
+            '&.Mui-focused fieldset': { borderColor: colors.primary },
           }
         }}
       />
-      
-      <WCAGOptions 
+
+      {localError && (
+        <FormHelperText error>
+          {localError}
+        </FormHelperText>
+      )}
+
+      <WCAGOptions
         options={wcagOptions}
         onChange={setWcagOptions}
         colors={colors}
       />
-      
-      {localError && (
-        <Typography 
-          variant="body2" 
-          color="error" 
-          sx={{ textAlign: 'center' }}
-        >
-          {localError}
-        </Typography>
-      )}
-      
-      <Button 
-        variant="contained" 
+
+      <Button
+        variant="contained"
         onClick={handleSubmit}
-        disabled={!htmlContent || isLoading}
+        disabled={!htmlContent.trim() || isLoading}
         fullWidth
-        sx={{ 
-          py: 1.5, 
-          mt: 2,
-          borderRadius: 2,
-          bgcolor: colors.primary,
-          '&:hover': {
-            bgcolor: colors.secondary,
-          }
-        }}
+        sx={{ py: 1.5, mt: 1 }}
       >
-        {isLoading ? 'Analyzing...' : 'Analyze Accessibility'}
+        {isLoading ? 'Analyzing…' : 'Analyze Accessibility'}
       </Button>
     </Box>
   );
 };
 
-export default HTMLCodeTab; 
+export default HTMLCodeTab;

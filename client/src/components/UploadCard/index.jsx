@@ -84,10 +84,10 @@ const UploadCard = ({
 
   return (
     <Paper
-      elevation={2}
+      elevation={0}
       sx={{
         width: "100%",
-        borderRadius: 2,
+        borderRadius: 1.5,
         overflow: "hidden",
         bgcolor: COLORS.background,
         maxWidth: "800px",
@@ -104,9 +104,13 @@ const UploadCard = ({
         sx={{
           borderBottom: 1,
           borderColor: COLORS.border,
-          "& .MuiTabs-indicator": {
-            backgroundColor: COLORS.primary,
-            height: 3,
+          "& .MuiTab-root": {
+            minHeight: { xs: 60, md: 68 },
+            textTransform: "none",
+            fontWeight: 600,
+            fontSize: "0.9rem",
+            color: COLORS.lightText,
+            "&.Mui-selected": { color: COLORS.primary },
           },
         }}
       >
@@ -114,28 +118,16 @@ const UploadCard = ({
           icon={<ContentPaste />}
           label="URL"
           aria-label="Enter URL for accessibility analysis"
-          sx={{
-            color: tabValue === 0 ? COLORS.primary : COLORS.lightText,
-            "&.Mui-selected": { color: COLORS.primary },
-          }}
         />
         <Tab
           icon={<CloudUpload />}
           label="Upload File"
           aria-label="Upload HTML file for accessibility analysis"
-          sx={{
-            color: tabValue === 1 ? COLORS.primary : COLORS.lightText,
-            "&.Mui-selected": { color: COLORS.primary },
-          }}
         />
         <Tab
           icon={<Code />}
           label="HTML Code"
           aria-label="Paste HTML code for accessibility analysis"
-          sx={{
-            color: tabValue === 2 ? COLORS.primary : COLORS.lightText,
-            "&.Mui-selected": { color: COLORS.primary },
-          }}
         />
       </Tabs>
 

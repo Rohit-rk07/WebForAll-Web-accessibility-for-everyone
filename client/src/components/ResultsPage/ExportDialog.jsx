@@ -10,6 +10,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
+import { Alert } from '@mui/material';
 import { extractAxeResults, calculateAccessibilityScore } from '../../utils/resultsUtils';
 
 // Constants
@@ -41,11 +42,13 @@ const SEVERITY_CONFIG = [
 
 const ExportDialog = ({ open, onClose, result, resultsRef }) => {
   const [loading, setLoading] = useState(false);
+  const [exportError, setExportError] = useState("");
   const dialogRef = React.useRef(null);
 
   // Handle focus management when dialog opens/closes
   React.useEffect(() => {
-    if (open && dialogRef.current) {
+    if (open) {
+      setExportError("");
       // Focus the first focusable element when dialog opens
       const timeoutId = setTimeout(() => {
         const firstFocusable = dialogRef.current?.querySelector('button');
@@ -61,6 +64,7 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
     
     try {
       setLoading(true);
+      setExportError("");
       const { default: jsPDF } = await import('jspdf');
       
       const axeResults = {
@@ -453,7 +457,9 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
       onClose();
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please check console for details.');
+      setExportError(
+        'Could not create the PDF report. Please check your connection and try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -492,6 +498,11 @@ const ExportDialog = ({ open, onClose, result, resultsRef }) => {
           <Typography component="li" variant="body2">Passed tests and incomplete items</Typography>
           <Typography component="li" variant="body2">Visual snapshot of results</Typography>
         </Box>
+        {exportError && (
+          <Alert severity="error" sx={{ mt: 2 }} role="alert" aria-live="assertive">
+            {exportError}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button 

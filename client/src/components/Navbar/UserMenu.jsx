@@ -50,7 +50,10 @@ const UserMenu = ({ anchorEl, open, onClose, onLogout }) => {
       PaperProps={{
         sx: {
           mt: 1.5,
-          boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
+          borderRadius: 1,
+          border: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0 12px 32px rgba(16, 24, 40, 0.16)",
           minWidth: 180,
           bgcolor: COLORS.background,
         },

@@ -14,7 +14,6 @@ import {
   Alert,
   CircularProgress,
   useTheme,
-  alpha,
 } from "@mui/material";
 
 import {
@@ -22,7 +21,8 @@ import {
   VisibilityOff,
   Email,
   Lock,
-  Security,
+  AccessibilityNew,
+  ArrowBack,
 } from "@mui/icons-material";
 
 import { useNavigate, Link } from "react-router-dom";
@@ -47,7 +47,6 @@ const Login = () => {
 
   /**
    * Handles form submission
-   * @param {Event} e - Form submit event
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,7 +54,6 @@ const Login = () => {
     setError("");
 
     try {
-      // Pass the email to the login function
       await login({ email, password });
       navigate("/dashboard/home");
     } catch (err) {
@@ -103,32 +101,49 @@ const Login = () => {
       }}
     >
       <Container maxWidth="sm">
+        <MuiLink
+          component={Link}
+          to="/"
+          underline="hover"
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.75, mb: 3, color: "text.secondary" }}
+        >
+          <ArrowBack fontSize="small" aria-hidden="true" />
+          Back to home
+        </MuiLink>
+
         <Paper
-          elevation={4}
+          elevation={0}
           sx={{
             p: { xs: 3, md: 5 },
-            borderRadius: 4,
-            boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
-            backgroundColor: alpha(theme.palette.background.paper, 0.9),
-            backdropFilter: "blur(10px)",
+            borderRadius: 1,
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor: "background.paper",
           }}
         >
           {/* Logo and Brand */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 6 }}>
-            <Avatar sx={{ bgcolor: "primary.main", width: 40, height: 40 }}>
-              <Security />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
+            <Avatar
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+              }}
+            >
+              <AccessibilityNew fontSize="small" />
             </Avatar>
-            <Typography variant="h5" component="h1" sx={{ fontWeight: "bold" }}>
+            <Typography variant="h5" component="span" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
               Accessibility Analyzer
             </Typography>
           </Box>
 
           {/* Page Title */}
-          <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+          <Typography variant="h3" component="h1" sx={{ fontWeight: 700, mb: 1, letterSpacing: "-0.02em" }}>
             Welcome back
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            Please sign in to your account to continue
+            Sign in to run scans and review your accessibility reports
           </Typography>
 
           {/* Error Alert */}
@@ -142,11 +157,7 @@ const Login = () => {
           <Box
             component="form"
             onSubmit={handleSubmit}
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 3,
-            }}
+            sx={{ display: "flex", flexDirection: "column", gap: 3 }}
           >
             {/* Email Field */}
             <TextField
@@ -157,6 +168,7 @@ const Login = () => {
               required
               fullWidth
               variant="outlined"
+              autoComplete="email"
               disabled={isSubmitting}
               InputProps={{
                 startAdornment: (
@@ -176,6 +188,7 @@ const Login = () => {
               required
               fullWidth
               variant="outlined"
+              autoComplete="current-password"
               disabled={isSubmitting}
               InputProps={{
                 startAdornment: (
@@ -218,11 +231,7 @@ const Login = () => {
               fullWidth
               disabled={isSubmitting}
               aria-label={isSubmitting ? "Signing in" : "Sign in"}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                mt: 2,
-              }}
+              sx={{ py: 1.5, mt: 1 }}
             >
               {isSubmitting ? (
                 <CircularProgress size={24} color="inherit" />
@@ -247,11 +256,7 @@ const Login = () => {
               fullWidth
               disabled={isSubmitting}
               aria-label="Continue as demo user"
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                mt: 1,
-              }}
+              sx={{ py: 1.5 }}
             >
               {isSubmitting ? (
                 <CircularProgress size={22} color="inherit" />
@@ -261,7 +266,7 @@ const Login = () => {
             </Button>
 
             {/* Sign Up Link */}
-            <Box sx={{ textAlign: "center", mt: 3 }}>
+            <Box sx={{ textAlign: "center", mt: 2 }}>
               <Typography variant="body2">
                 Don't have an account?{" "}
                 <MuiLink

@@ -1018,14 +1018,11 @@ async def list_history(request: Request, limit: int = 50, skip: int = 0, current
     # Omit the bulky result/summary payloads from the list view
     projection = {
         "_id": 1,
-        "owner_email": 0,
         "input_type": 1,
         "input_ref": 1,
         "wcag_options": 1,
         "violations_count": 1,
         "created_at": 1,
-        "result": 0,
-        "summary": 0,
     }
     cursor = analyses_col.find(
         {"owner_email": current_user.email},

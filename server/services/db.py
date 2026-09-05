@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 
 MONGODB_URI = os.environ.get("MONGODB_URI")
-DB_NAME = os.environ.get("MONGODB_DB_NAME", "webforall")
+DB_NAME = os.environ.get("MONGODB_DB_NAME", "accessibility-analyzer")
 
 if not MONGODB_URI:
     # Fail-fast is acceptable; caller should ensure env is set.
