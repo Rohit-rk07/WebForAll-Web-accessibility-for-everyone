@@ -22,15 +22,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Run the application without root privileges.
-RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+# The Playwright base image already ships a user at UID 1000, so use a free
+# UID for the app user to avoid "UID 1000 is not unique".
+RUN useradd --create-home --uid 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
 EXPOSE 8000
 
-# Use gunicorn with uvicorn workers for production performance
-# Install gunicorn for production
-RUN pip install --no-cache-dir gunicorn
+# gunicorn is installed via requirements.txt (above, as root)
 
 # Health check - use simpler health check that doesn't require requests library
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

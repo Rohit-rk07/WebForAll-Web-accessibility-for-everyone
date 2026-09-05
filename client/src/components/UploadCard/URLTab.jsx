@@ -50,6 +50,7 @@ const URLTab = ({ onAnalyze, setIsLoading, isLoading, colors, onError = () => {}
     try {
       const result = await apiJson('/analyze/url', {
         method: 'POST',
+        timeoutMs: 110000,
         body: JSON.stringify({
           url: trimmed,
           wcag_options: wcagOptions

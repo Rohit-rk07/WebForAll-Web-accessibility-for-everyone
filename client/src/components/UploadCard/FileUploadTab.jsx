@@ -107,7 +107,7 @@ const FileUploadTab = ({
       formData.append('file', file);
       formData.append('wcag_options', JSON.stringify(wcagOptions));
 
-      const result = await apiForm('/analyze/file', formData);
+      const result = await apiForm('/analyze/file', formData, { timeoutMs: 110000 });
 
       if (result && result.id) {
         navigate(`/dashboard/results/${result.id}`);

@@ -114,23 +114,25 @@ export const apiJson = async (path, options = {}) => {
     throw createRequestError(getUserFacingError(new Error("offline")));
   }
 
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
+
   const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(
-    (options.method || "POST").toUpperCase(),
+    (fetchOptions.method || "POST").toUpperCase(),
   );
   const csrfHeader = isStateChanging ? await csrfHeaders() : {};
   const authHeaderValue = await authHeaders();
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(buildUrl(path), {
-      ...options,
-      signal: options.signal || controller.signal,
+      ...fetchOptions,
+      signal: fetchOptions.signal || controller.signal,
       headers: {
         ...csrfHeader,
         ...authHeaderValue,
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        ...(options.headers || {}),
+        ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+        ...(fetchOptions.headers || {}),
       },
     });
 
@@ -151,20 +153,22 @@ export const apiForm = async (path, formData, options = {}) => {
     throw createRequestError(getUserFacingError(new Error("offline")));
   }
 
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
+
   const csrfHeader = await csrfHeaders();
   const authHeaderValue = await authHeaders();
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(buildUrl(path), {
-      ...options,
-      signal: options.signal || controller.signal,
-      method: options.method || "POST",
+      ...fetchOptions,
+      signal: fetchOptions.signal || controller.signal,
+      method: fetchOptions.method || "POST",
       headers: {
         ...csrfHeader,
         ...authHeaderValue,
-        ...(options.headers || {}),
+        ...(fetchOptions.headers || {}),
       },
       body: formData,
     });

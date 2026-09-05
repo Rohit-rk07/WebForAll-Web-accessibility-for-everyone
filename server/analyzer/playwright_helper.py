@@ -6,9 +6,12 @@ import asyncio
 import json
 import ipaddress
 import logging
+import os
 import socket
 import traceback
-from typing import Dict, Any, List
+import weakref
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 from urllib.parse import urlsplit
 
 import requests
@@ -21,6 +24,23 @@ _PLAYWRIGHT = None
 _BROWSER = None
 _AXE_SOURCE = None
 _AXE_URL = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js"
+_AXE_LOCAL_PATH = Path(__file__).with_name("axe-core.min.js")
+
+_DEFAULT_SCAN_CONCURRENCY = 3
+_scan_semaphores = weakref.WeakKeyDictionary()
+
+
+async def _get_scan_semaphore() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    semaphore = _scan_semaphores.get(loop)
+    if semaphore is None:
+        try:
+            concurrency = int(os.environ.get("SCAN_CONCURRENCY", str(_DEFAULT_SCAN_CONCURRENCY)))
+        except (TypeError, ValueError):
+            concurrency = _DEFAULT_SCAN_CONCURRENCY
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+        _scan_semaphores[loop] = semaphore
+    return semaphore
 
 
 # Hostname suffixes that can never be globally routable, used to block
@@ -191,11 +211,17 @@ async def get_browser():
 
 
 async def get_axe_source() -> str | None:
-    """Fetch and cache axe-core source without caching a coroutine object."""
+    """Load and cache axe-core source, preferring the vendored local copy."""
     global _AXE_SOURCE
 
     if _AXE_SOURCE is not None:
         return _AXE_SOURCE
+
+    try:
+        _AXE_SOURCE = _AXE_LOCAL_PATH.read_text(encoding="utf-8")
+        return _AXE_SOURCE
+    except Exception as exc:
+        logger.warning(f"Unable to read local axe-core source: {exc}")
 
     try:
         response = await asyncio.to_thread(requests.get, _AXE_URL, timeout=15)
@@ -220,6 +246,13 @@ async def close_browser():
 
 
 async def run_analysis(data: Dict[str, Any]):
+    """Run one scan, bounded by the per-process SCAN_CONCURRENCY limit."""
+    semaphore = await _get_scan_semaphore()
+    async with semaphore:
+        return await _run_analysis_within_slot(data)
+
+
+async def _run_analysis_within_slot(data: Dict[str, Any]):
     import os
     import traceback
 

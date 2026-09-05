@@ -12,7 +12,6 @@ export default defineConfig({
           // Vendor chunks for better caching
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          'utils-vendor': ['axios', 'html2canvas', 'jspdf', 'lucide-react', 'react-syntax-highlighter'],
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',

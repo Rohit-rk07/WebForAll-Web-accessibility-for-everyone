@@ -40,6 +40,7 @@ const HTMLCodeTab = ({
     try {
       const result = await apiJson('/analyze/html', {
         method: 'POST',
+        timeoutMs: 110000,
         body: JSON.stringify({
           content: htmlContent,
           wcag_options: wcagOptions

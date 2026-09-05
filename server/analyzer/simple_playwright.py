@@ -14,25 +14,50 @@ logger = logging.getLogger(__name__)
 
 # Import the helper implementation directly to avoid subprocess overhead.
 HELPER_SCRIPT = Path(__file__).parent / "playwright_helper.py"
-_WINDOWS_ANALYSIS_LOCK = threading.Lock()
+class _ScanLoop:
+    """Persistent Proactor loop hosting the browser so Windows scans reuse it."""
 
-# Import browser pool for resource optimization
-from analyzer.browser_pool import browser_pool
+    def __init__(self):
+        self._loop = None
+        self._ready = threading.Event()
+        self._thread = threading.Thread(target=self._entry, name="scan-loop", daemon=True)
+        self._thread.start()
+        self._ready.wait()
+
+    def _entry(self):
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        self._ready.set()
+        try:
+            self._loop.run_forever()
+        finally:
+            self._loop.close()
+
+    @property
+    def loop(self):
+        return self._loop
+
+    def submit(self, coro_factory):
+        return asyncio.run_coroutine_threadsafe(coro_factory(), self._loop)
 
 
-async def _run_windows_analysis_async(data: Dict[str, Any]):
-    from analyzer.playwright_helper import close_browser, run_analysis
-
-    try:
-        return await run_analysis(data)
-    finally:
-        await close_browser()
+_SCAN_LOOP = None
 
 
-def _run_windows_analysis(data: Dict[str, Any]):
-    """Run Playwright on a dedicated Proactor loop on Windows."""
-    with _WINDOWS_ANALYSIS_LOCK:
-        return asyncio.run(_run_windows_analysis_async(data))
+def _get_scan_loop():
+    global _SCAN_LOOP
+    if _SCAN_LOOP is None:
+        _SCAN_LOOP = _ScanLoop()
+    return _SCAN_LOOP
+
+
+async def _run_on_scan_loop(data: Dict[str, Any]):
+    """Schedule a scan on the dedicated Windows loop and await its completion."""
+    from analyzer.playwright_helper import run_analysis
+
+    future = _get_scan_loop().submit(lambda: run_analysis(data))
+    return await asyncio.wrap_future(future)
 
 async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
     """
@@ -61,14 +86,11 @@ async def analyze_url(url: str, wcag_options: Optional[Dict[str, Any]] = None):
             "wcag_options": wcag_options or {}
         }
 
-        # Skip browser pool for Windows due to async transport issues
-        # Uvicorn uses a selector loop for Windows reload mode, which cannot
-        # create the subprocess used by Playwright's async transport.
+        # Uvicorn's Windows loop cannot drive Playwright's async transport,
+        # so scans run on a dedicated Proactor loop that keeps the browser
+        # warm between scans instead of relaunching it per scan.
         if sys.platform == "win32":
-            return await asyncio.to_thread(_run_windows_analysis, data)
-
-        # Initialize browser pool if not already initialized (Linux/Mac only)
-        # await browser_pool.initialize()
+            return await _run_on_scan_loop(data)
 
         # Import lazily so the module stays light until analysis is requested.
         from analyzer.playwright_helper import run_analysis
