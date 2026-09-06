@@ -13,9 +13,9 @@ client/dist/
 
 # Python virtualenv and cache
 server/venv/
-server/__pycache__/
-server/*.py[cod]
-server/*.pyo
+__pycache__/
+*.py[cod]
+*.pyo
 
 # Playwright/test output (optional, safe to keep)
 playwright-report/
