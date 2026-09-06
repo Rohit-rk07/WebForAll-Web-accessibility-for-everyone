@@ -140,15 +140,16 @@ class TestAuthenticationEndpoints:
             # Mock user exists
             mock_users.find_one = AsyncMock(return_value={"email": "test@example.com"})
             with patch('main.prt_col.find_one', new=AsyncMock(return_value=None)):
+                with patch('main.prt_col.insert_one', new=AsyncMock()):
 
-                response = client.post(
-                    "/forgot-password",
-                    json={"email": "test@example.com"},
-                    headers=csrf_headers()
-                )
-            assert response.status_code == 200
-            data = response.json()
-            assert "message" in data
+                    response = client.post(
+                        "/forgot-password",
+                        json={"email": "test@example.com"},
+                        headers=csrf_headers()
+                    )
+                assert response.status_code == 200
+                data = response.json()
+                assert "message" in data
 
     def test_forgot_password_user_not_found(self):
         """Test forgot password with non-existent user (should not reveal)."""
