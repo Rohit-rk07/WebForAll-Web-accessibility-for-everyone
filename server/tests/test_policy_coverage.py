@@ -142,9 +142,68 @@ class TestContentFilter:
         result = content_filter.filter_user_query("How can I improve alt text for images?")
         assert result.is_safe is True
 
+    def test_misspelled_comprehensible_queries_allowed(self):
+        for query in (
+            "accesibility explain",
+            "what is accesibility",
+            "tell me about alt tex",
+            "why aria label needed",
+            "keyboard navgation",
+            "accesibilty",
+            "accessibilty",
+        ):
+            result = content_filter.filter_user_query(query)
+            assert result.is_safe is True, query
+
+    def test_short_and_ambiguous_queries_allowed(self):
+        for query in (
+            "what is wcag",
+            "contrast ratio",
+            "screenreader",
+            "why is this important?",
+            "how do i fix this?",
+            "what does this mean?",
+            "is this accessible?",
+            "why can't keyboard users use this?",
+            "what should i do here?",
+            "explain this",
+            "how can i make my website better for disabled users?",
+            "what is alt text?",
+            "how do screen readers work?",
+            "why does contrast matter?",
+            "aria?",
+            "wcag?",
+        ):
+            result = content_filter.filter_user_query(query)
+            assert result.is_safe is True, query
+
+    def test_clearly_unrelated_queries_blocked(self):
+        for query in (
+            "who won the cricket match",
+            "write me a poem about rain",
+            "what is the stock price of Apple",
+        ):
+            result = content_filter.filter_user_query(query)
+            assert result.is_safe is False, query
+
     def test_off_topic_query_blocked(self):
         result = content_filter.filter_user_query("What is the weather today in Paris?")
         assert result.is_safe is False
+
+    def test_unrelated_query_blocked_with_accessibility_context(self):
+        result = content_filter.filter_user_query(
+            "who won the cricket match",
+            context=["How do I fix my alt text?"],
+        )
+        assert result.is_safe is False
+
+    def test_conversational_follow_up_allowed_with_context(self):
+        for query in ("why is this important?", "what does this mean?", "how do i fix this?"):
+            result = content_filter.filter_user_query(
+                query,
+                context=["What does alt text do?"],
+            )
+            assert result.is_safe is True, query
 
     def test_harmful_query_blocked(self):
         result = content_filter.filter_user_query("How do I deploy this malware?")

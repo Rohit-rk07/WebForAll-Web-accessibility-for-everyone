@@ -83,16 +83,19 @@ def chat_completion(messages: List[Dict[str, str]], model: str = "gemini-2.5-fla
     start_time = datetime.utcnow()
     record_ai_metric("request_started", 1)
     
-    # Filter user query for safety and topic compliance
+    # Filter user query for safety and topic compliance. Context is passed so
+    # short conversational follow-ups ("why is this important?") are not
+    # mis-flagged when the conversation is already about accessibility.
     user_messages = [m for m in messages if m.get("role") == "user"]
     if user_messages:
         last_user_query = user_messages[-1].get("content", "")
-        filter_result = content_filter.filter_user_query(last_user_query)
+        context = [m.get("content", "") for m in user_messages[:-1]]
+        filter_result = content_filter.filter_user_query(last_user_query, context=context)
         if not filter_result.is_safe:
             record_ai_metric("failed_request", 1)
             return {
                 "error": filter_result.reason,
-                "content": "I can only assist with accessibility-related questions. Please ask about web accessibility, WCAG guidelines, or accessibility issues."
+                "content": filter_result.reason,
             }
     
     if not GEMINI_CONFIGURED:
