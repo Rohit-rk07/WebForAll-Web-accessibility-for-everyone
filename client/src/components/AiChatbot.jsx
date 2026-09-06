@@ -2,25 +2,29 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Button,
+  Chip,
   Typography,
   IconButton,
-  Paper,
   TextField,
-  CircularProgress,
   Tooltip,
-  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import {
-  SmartToy,
-  Close,
-  Send,
-  Minimize,
-  Maximize,
-  ErrorOutline,
-  Refresh,
-} from "@mui/icons-material";
+import SmartToy from "@mui/icons-material/SmartToy";
+import Close from "@mui/icons-material/Close";
+import Send from "@mui/icons-material/Send";
+import Minimize from "@mui/icons-material/Minimize";
+import Maximize from "@mui/icons-material/Maximize";
+import ErrorOutline from "@mui/icons-material/ErrorOutline";
+import Refresh from "@mui/icons-material/Refresh";
 import aiService from "../services/aiService";
+import "./AiChatbot.css";
+
+const SUGGESTIONS = [
+  "Explain WCAG",
+  "What is alt text?",
+  "How do I fix contrast issues?",
+  "What is an ARIA label?",
+];
 
 /**
  * Global AI Chatbot component
@@ -32,15 +36,48 @@ const AiChatbot = React.memo(() => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [chatWidth, setChatWidth] = useState(350);
+  const [chatWidth, setChatWidth] = useState(380);
   const messagesRef = useRef(messages);
   const inputRef = useRef(null);
   const toggleRef = useRef(null);
   const lastUserMessageRef = useRef(null);
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   /**
-   * Sends a user message through the AI service and appends the reply.
-   * Reused by the send flow, the context-message entry point, and retry.
+   * Sends the current history to the AI service and appends exactly one
+   * assistant response (success or error). Shared by the send flow, the
+   * context-message entry point, and retry.
+   */
+  const respondTo = async (history) => {
+    setIsLoading(true);
+    try {
+      const response = await aiService.sendChatMessage(history);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response.content, isError: false },
+      ]);
+    } catch (error) {
+      console.error("Error sending chat message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            error.message ||
+            "I'm having trouble reaching the AI service right now. Check your connection and try again.",
+          isError: true,
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Sends a user message (or retries a failed one) and appends the reply.
    */
   const sendMessage = (text) => {
     const trimmed = (text || "").trim();
@@ -51,54 +88,17 @@ const AiChatbot = React.memo(() => {
     // Retry case: the last exchange ended in an error from the same prompt.
     // Drop the stale error bubble instead of duplicating the user message.
     const prior = messagesRef.current;
-    const canRetry =
+    const isRetry =
       prior.length >= 2 &&
       prior[prior.length - 1].isError === true &&
       prior[prior.length - 2].role === "user" &&
       prior[prior.length - 2].content === trimmed;
 
-    let working = prior;
-    if (canRetry) {
-      setMessages((prev) => prev.filter((_, i) => i !== prev.length - 1));
-      working = prior.slice(0, -1);
-    } else {
-      const userMessage = { role: "user", content: trimmed };
-      setMessages((prev) => [...prev, userMessage]);
-      working = [...prior, userMessage];
-    }
-
+    const history = isRetry ? prior.slice(0, -1) : [...prior, { role: "user", content: trimmed }];
+    setMessages(history);
     setInput("");
-    setIsLoading(true);
-
-    aiService
-      .sendChatMessage(working)
-      .then((response) => {
-        const assistantMessage = {
-          role: "assistant",
-          content: response.content,
-          isError: false,
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      })
-      .catch((error) => {
-        console.error("Error sending chat message:", error);
-        const errorMessage = {
-          role: "assistant",
-          content:
-            error.message ||
-            "I'm having trouble reaching the AI service right now. Check your connection and try again.",
-          isError: true,
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    void respondTo(history);
   };
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   // Expose methods globally for other components to use
   useEffect(() => {
@@ -107,39 +107,11 @@ const AiChatbot = React.memo(() => {
       addContextMessage: async (message) => {
         const trimmed = (message || "").trim();
         if (!trimmed) return;
-        // Add user message and open the panel
         lastUserMessageRef.current = trimmed;
-        setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+        const history = [...messagesRef.current, { role: "user", content: trimmed }];
+        setMessages(history);
         setIsOpen(true);
-        setIsLoading(true);
-
-        try {
-          const currentMessages = [
-            ...messagesRef.current,
-            { role: "user", content: trimmed },
-          ];
-          const response = await aiService.sendChatMessage(currentMessages);
-
-          const assistantMessage = {
-            role: "assistant",
-            content: response.content,
-            isError: false,
-          };
-
-          setMessages((prev) => [...prev, assistantMessage]);
-        } catch (error) {
-          console.error("Error sending context message:", error);
-          const errorMessage = {
-            role: "assistant",
-            content:
-              error.message ||
-              "I'm having trouble reaching the AI service right now. Check your connection and try again.",
-            isError: true,
-          };
-          setMessages((prev) => [...prev, errorMessage]);
-        } finally {
-          setIsLoading(false);
-        }
+        await respondTo(history);
       },
     };
 
@@ -161,35 +133,25 @@ const AiChatbot = React.memo(() => {
     }
   }, [messages]);
 
-  /**
-   * Toggles the chatbot open/closed
-   */
   const toggleChat = () => {
     setIsOpen((prev) => !prev);
   };
 
-  /**
-   * Handles sending a message
-   */
   const handleSend = () => {
     if (!input.trim() || isLoading) return;
     sendMessage(input);
   };
 
-  /**
-   * Handles pressing Enter to send
-   */
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  // Close the panel with Escape and manage focus when it opens/closes
+  // Manage focus and Escape-to-close when the panel opens/closes
   useEffect(() => {
     if (!isOpen) {
-      // Return focus to the toggle so keyboard users know where they are
       toggleRef.current?.focus();
       return;
     }
@@ -213,151 +175,177 @@ const AiChatbot = React.memo(() => {
         }}
       >
         <Tooltip title={isOpen ? "Close AI Assistant" : "Ask AI Assistant"}>
-          <Button
+          <IconButton
             ref={toggleRef}
-            variant="contained"
             color="primary"
             aria-label={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
             aria-expanded={isOpen}
             onClick={toggleChat}
             sx={{
+              width: 60,
+              height: 60,
               borderRadius: "50%",
-              minWidth: "60px",
-              height: "60px",
-              boxShadow: 3,
+              boxShadow: "0 6px 16px rgba(16, 24, 40, 0.18)",
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              "&:hover": { bgcolor: "primary.dark" },
             }}
           >
             {isOpen ? <Close /> : <SmartToy />}
-          </Button>
+          </IconButton>
         </Tooltip>
       </Box>
 
       {/* Chat Panel */}
-      <Box
-        role={isOpen ? "dialog" : undefined}
-        aria-label="AI Assistant"
-        sx={{
-          position: "fixed",
-          top: 64,
-          right: 0,
-          width: isOpen ? chatWidth : 0,
-          height: "calc(100vh - 64px)",
-          bgcolor: "background.paper",
-          boxShadow: 3,
-          zIndex: 1300,
-          transform: isOpen ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.3s ease-in-out, width 0.3s ease-in-out",
-          borderLeft: `1px solid ${theme.palette.divider}`,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: isOpen ? 300 : 0,
-          maxWidth: "80vw",
-        }}
-      >
-        {/* Header */}
+      {isOpen && (
         <Box
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="ai-chat-title"
+          aria-describedby="ai-chat-subtitle"
+          className="a11y-chat-panel"
           sx={{
-            p: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
+            position: "fixed",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            bgcolor: theme.palette.mode === "dark" ? "grey.900" : "grey.50",
+            flexDirection: "column",
+            overflow: "hidden",
+            bgcolor: "background.paper",
+            boxShadow: "0 12px 32px rgba(16, 24, 40, 0.16)",
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 2,
+            zIndex: 1300,
+            width: chatWidth,
+            height: "min(640px, calc(100vh - 148px))",
+            bottom: 96,
+            right: 24,
+            [theme.breakpoints.down("sm")]: {
+              width: "auto",
+              height: "calc(100dvh - 92px)",
+              top: 8,
+              left: 8,
+              right: 8,
+              bottom: 76,
+              borderRadius: 2,
+            },
           }}
         >
-          <Typography
-            variant="h6"
+          {/* Header */}
+          <Box
             sx={{
-              fontWeight: "bold",
+              px: 2,
+              py: 1.5,
+              borderBottom: `1px solid ${theme.palette.divider}`,
               display: "flex",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 1,
             }}
           >
-            <SmartToy color="primary" />
-            AI Assistant
-          </Typography>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Tooltip title={chatWidth >= 600 ? "Minimize" : "Expand"}>
-<IconButton
-              size="small"
-              aria-label="Resize AI assistant panel"
-              onClick={() => setChatWidth(chatWidth >= 600 ? 350 : 1500)}
-            >
-              {chatWidth >= 600 ? <Minimize /> : <Maximize />}
-            </IconButton>
-            </Tooltip>
-            <IconButton
-              size="small"
-              aria-label="Close AI assistant"
-              onClick={toggleChat}
-            >
-              <Close fontSize="small" />
-            </IconButton>
-          </Box>
-        </Box>
-
-        {/* Messages - This is the only part that should scroll */}
-        <Box
-          sx={{
-            flexGrow: 1,
-            overflow: "auto", // Allow scrolling only for messages
-            p: 2,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {messages.map((message, index) => (
-            <Box
-              key={index}
-              sx={{
-                mb: 2,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: message.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
-              <Paper
-                elevation={1}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+              <Box
+                component="span"
                 sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  maxWidth: "85%",
-                  bgcolor: message.isError
-                    ? theme.palette.mode === "dark"
-                      ? "rgba(211, 47, 47, 0.18)"
-                      : "#fdecea"
-                    : message.role === "user"
-                      ? "primary.main"
-                      : theme.palette.mode === "dark"
-                        ? "grey.800"
-                        : "#ffffff",
-                  color: message.isError
-                    ? theme.palette.text.primary
-                    : message.role === "user"
-                      ? "white"
-                      : theme.palette.mode === "dark"
-                        ? "grey.100"
-                        : "#000000",
-                  border: message.isError
-                    ? `1px solid ${theme.palette.error.main}`
-                    : message.role === "assistant"
-                      ? `2px solid`
-                      : "none",
-                  borderColor:
-                    theme.palette.mode === "dark" ? "grey.700" : "#e0e0e0",
-                  boxShadow:
-                    message.role === "assistant"
-                      ? "0 2px 8px rgba(0,0,0,0.1)"
-                      : "none",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  bgcolor: "primary.main",
+                  color: "primary.contrastText",
+                  flexShrink: 0,
+                }}
+              >
+                <SmartToy fontSize="small" />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography id="ai-chat-title" variant="subtitle1" noWrap>
+                  AI Assistant
+                </Typography>
+                <Typography
+                  id="ai-chat-subtitle"
+                  variant="caption"
+                  sx={{ color: "text.secondary", display: "block" }}
+                  noWrap
+                >
+                  Accessibility guidance
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
+              <Tooltip title={chatWidth >= 560 ? "Shrink panel" : "Expand panel"}>
+                <IconButton
+                  size="small"
+                  aria-label={chatWidth >= 560 ? "Shrink panel" : "Expand panel"}
+                  onClick={() => setChatWidth(chatWidth >= 560 ? 380 : 560)}
+                  sx={{
+                    "&:hover": { bgcolor: "action.hover" },
+                    [theme.breakpoints.down("sm")]: { display: "none" },
+                  }}
+                >
+                  {chatWidth >= 560 ? <Minimize fontSize="small" /> : <Maximize fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <IconButton
+                size="small"
+                aria-label="Close AI assistant"
+                onClick={toggleChat}
+                sx={{ "&:hover": { bgcolor: "action.hover" } }}
+              >
+                <Close fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
+
+          {/* Messages - the only part that scrolls */}
+          <Box
+            aria-live="polite"
+            sx={{
+              flexGrow: 1,
+              overflow: "auto",
+              px: 2,
+              py: 2,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {messages.map((message, index) => (
+              <Box
+                key={index}
+                className="a11y-chat-bubble"
+                sx={{
+                  mb: 1.5,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: message.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "100%",
                 }}
               >
                 {message.isError ? (
-                  <Alert
-                    severity="error"
-                    icon={<ErrorOutline fontSize="small" />}
-                    sx={{ p: 0, pb: 1.25, wordBreak: "break-word" }}
-                    action={
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 1,
+                      p: 1.5,
+                      borderRadius: 2,
+                      maxWidth: "85%",
+                      bgcolor:
+                        theme.palette.mode === "dark"
+                          ? "rgba(211, 47, 47, 0.16)"
+                          : "#fdecea",
+                      color: "text.primary",
+                      border: `1px solid ${theme.palette.error.main}`,
+                    }}
+                  >
+                    <ErrorOutline fontSize="small" sx={{ mt: 0.5, color: "error.main" }} />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                      >
+                        {message.content}
+                      </Typography>
                       <Button
                         color="inherit"
                         size="small"
@@ -365,40 +353,62 @@ const AiChatbot = React.memo(() => {
                         onClick={() => sendMessage(lastUserMessageRef.current)}
                         disabled={isLoading}
                         aria-label="Retry sending your message"
+                        sx={{ alignSelf: "flex-start", minHeight: 32 }}
                       >
                         Retry
                       </Button>
-                    }
-                  >
-                    {message.content}
-                  </Alert>
+                    </Box>
+                  </Box>
                 ) : (
-                <Box>
-                  {message.content.split("```").map((part, i) => {
-                    if (i % 2 === 0) {
-                      // Regular text - render markdown-style formatting
-                      return (
-                        <Typography
-                          key={i}
-                          variant="body2"
-                          sx={{
-                            whiteSpace: "pre-wrap",
-                            mb: part.trim() ? 1 : 0,
-                          }}
-                        >
-                          {part
-                            .split("**")
-                            .map((textPart, j) =>
-                              j % 2 === 0 ? (
-                                textPart
-                              ) : (
-                                <strong key={j}>{textPart}</strong>
-                              ),
-                            )}
-                        </Typography>
-                      );
-                    } else {
-                      // Code block
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      maxWidth: "85%",
+                      bgcolor:
+                        message.role === "user"
+                          ? "primary.main"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(230, 233, 238, 0.08)"
+                            : "#f2f4f8",
+                      color:
+                        message.role === "user"
+                          ? "primary.contrastText"
+                          : "text.primary",
+                      borderTopRightRadius: message.role === "user" ? 3 : 2,
+                      borderTopLeftRadius: message.role === "user" ? 2 : 3,
+                    }}
+                  >
+                    {message.content.split("```").map((part, i) => {
+                      if (i % 2 === 0) {
+                        return (
+                          <Typography
+                            key={i}
+                            variant="body2"
+                            sx={{
+                              whiteSpace: "pre-wrap",
+                              mb: part.trim() ? 1 : 0,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {part
+                              .split("**")
+                              .map((textPart, j) =>
+                                j % 2 === 0 ? (
+                                  textPart
+                                ) : (
+                                  <Box
+                                    component="span"
+                                    fontWeight="bold"
+                                    key={j}
+                                  >
+                                    {textPart}
+                                  </Box>
+                                ),
+                              )}
+                          </Typography>
+                        );
+                      }
                       const lines = part.split("\n");
                       const language = lines[0]?.trim() || "html";
                       const code = lines.slice(1).join("\n").trim();
@@ -406,7 +416,7 @@ const AiChatbot = React.memo(() => {
                       if (!code) return null;
 
                       return (
-                        <Box key={i} sx={{ my: 2 }}>
+                        <Box key={i} sx={{ my: 1.5 }}>
                           <Typography
                             variant="caption"
                             sx={{
@@ -424,24 +434,14 @@ const AiChatbot = React.memo(() => {
                             component="pre"
                             sx={{
                               bgcolor:
-                                theme.palette.mode === "dark"
-                                  ? "#23272f"
-                                  : "#2d3748",
-                              color:
-                                theme.palette.mode === "dark"
-                                  ? "#e2e8f0"
-                                  : "#ffffff",
-                              p: 2,
-                              borderRadius: 2,
+                                theme.palette.mode === "dark" ? "#23272f" : "#2d3748",
+                              color: theme.palette.mode === "dark" ? "#e2e8f0" : "#ffffff",
+                              p: 1.5,
+                              borderRadius: 1,
                               overflow: "auto",
-                              fontFamily:
-                                '"Fira Code", "Consolas", "Monaco", monospace',
-                              fontSize: "0.875rem",
+                              fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
+                              fontSize: "0.8125rem",
                               lineHeight: 1.5,
-                              border:
-                                theme.palette.mode === "dark"
-                                  ? `1px solid ${theme.palette.divider}`
-                                  : "1px solid #4a5568",
                               m: 0,
                             }}
                           >
@@ -449,71 +449,148 @@ const AiChatbot = React.memo(() => {
                           </Box>
                         </Box>
                       );
-                    }
-                  })}
-                </Box>
+                    })}
+                  </Box>
                 )}
-              </Paper>
-            </Box>
-          ))}
-          {isLoading && (
-            <Box sx={{ display: "flex", justifyContent: "flex-start", mb: 2 }}>
-              <Paper
-                elevation={1}
+              </Box>
+            ))}
+
+            {isLoading && (
+              <Box
+                className="a11y-chat-bubble"
                 sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor:
-                    theme.palette.mode === "dark" ? "grey.800" : "#ffffff",
-                  color: theme.palette.mode === "dark" ? "grey.100" : "#000000",
-                  border: `2px solid`,
-                  borderColor:
-                    theme.palette.mode === "dark" ? "grey.700" : "#e0e0e0",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                  display: "flex",
+                  justifyContent: "flex-start",
+                  mb: 1.5,
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <CircularProgress size={16} sx={{ mr: 1 }} />
-                  <Typography variant="body2">AI is thinking...</Typography>
+                <Box
+                  role="status"
+                  aria-label="AI is typing"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.75,
+                    bgcolor:
+                      theme.palette.mode === "dark"
+                        ? "rgba(230, 233, 238, 0.08)"
+                        : "#f2f4f8",
+                    color: "text.secondary",
+                  }}
+                >
+                  <span className="a11y-chat-dot" />
+                  <span className="a11y-chat-dot" />
+                  <span className="a11y-chat-dot" />
                 </Box>
-              </Paper>
-            </Box>
-          )}
-        </Box>
+              </Box>
+            )}
 
-        {/* Input */}
-        <Box
-          sx={{
-            p: 2,
-            borderTop: `1px solid`,
-            borderColor: "divider",
-            display: "flex",
-          }}
-        >
-          <TextField
-            inputRef={inputRef}
-            fullWidth
-            variant="outlined"
-            label="Ask about accessibility..."
-            size="small"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            multiline
-            maxRows={4}
-            sx={{ mr: 1 }}
-          />
-          <Button
-            variant="contained"
-            aria-label="Send message"
-            onClick={handleSend}
-            disabled={isLoading || !input.trim()}
-            sx={{ minWidth: "auto", px: 2 }}
+            {/* Suggested prompts shown only before the first real exchange */}
+            {messages.length === 1 && !isLoading && (
+              <Box
+                className="a11y-chat-bubble"
+                sx={{
+                  mt: 1,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 1,
+                  justifyContent: "center",
+                }}
+              >
+                {SUGGESTIONS.map((suggestion) => (
+                  <Chip
+                    key={suggestion}
+                    label={suggestion}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => sendMessage(suggestion)}
+                    sx={{ borderColor: "divider", fontWeight: 500, cursor: "pointer" }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* Composer */}
+          <Box
+            sx={{
+              p: 1.5,
+              borderTop: `1px solid ${theme.palette.divider}`,
+              display: "flex",
+              alignItems: "flex-end",
+              gap: 1,
+            }}
           >
-            <Send fontSize="small" />
-          </Button>
+            <Box
+              sx={{
+                flexGrow: 1,
+                display: "flex",
+                alignItems: "flex-end",
+                bgcolor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(230, 233, 238, 0.06)"
+                    : "#f2f4f8",
+                borderRadius: "18px",
+                border: `1px solid transparent`,
+                transition: "border-color 150ms ease, box-shadow 150ms ease",
+                "&:focus-within": {
+                  borderColor: "primary.main",
+                  boxShadow: `0 0 0 3px ${theme.palette.primary.main}33`,
+                },
+              }}
+            >
+              <TextField
+                inputRef={inputRef}
+                fullWidth
+                variant="standard"
+                placeholder="Ask about WCAG, accessibility, ARIA, keyboard navigation..."
+                size="small"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                multiline
+                maxRows={4}
+                aria-label="Message the AI assistant"
+                InputProps={{
+                  disableUnderline: true,
+                  sx: {
+                    px: 1.5,
+                    py: 1,
+                    borderRadius: "18px",
+                    color: "text.primary",
+                  },
+                }}
+              />
+            </Box>
+            <IconButton
+              color="primary"
+              aria-label="Send message"
+              disabled={isLoading || !input.trim()}
+              onClick={handleSend}
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                flexShrink: 0,
+                "&:hover": {
+                  bgcolor: "primary.dark",
+                  color: "primary.contrastText",
+                },
+                "&.Mui-disabled": {
+                  bgcolor: "action.selected",
+                  color: "text.disabled",
+                },
+              }}
+            >
+              <Send fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
-      </Box>
+      )}
     </>
   );
 });

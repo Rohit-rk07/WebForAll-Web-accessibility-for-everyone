@@ -86,7 +86,7 @@ export const sendChatMessage = async (messages, options = {}) => {
     });
     // Handle both success and error responses from backend
     if (response.error) {
-      throw new Error(response.error);
+      throw new Error(response.content || response.error);
     }
     return response;
   } catch (error) {
