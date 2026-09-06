@@ -17,6 +17,30 @@ __pycache__/
 *.py[cod]
 *.pyo
 
+# Python virtualenvs (any location) and packaging/build artifacts
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+build/
+pip-wheel-metadata/
+
+# Logs
+*.log
+logs/
+
+# Coverage / test tooling output
+coverage/
+htmlcov/
+ir.xml
+junit.xml
+
+# Deploy tool caches
+/.vercel/
+/.railway/
+/.netlify/
+
 # Playwright/test output (optional, safe to keep)
 playwright-report/
 test-results/
