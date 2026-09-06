@@ -271,8 +271,11 @@ class TestSecurityGuardsOnEndpoints:
             assert response.status_code == 200
             _, kwargs = mock_analyses.find.call_args
             projection = kwargs["projection"]
-            assert projection.get("result") == 0
-            assert projection.get("summary") == 0
+            assert isinstance(projection, dict)
+            assert "result" not in projection
+            assert "summary" not in projection
+            for field in ("_id", "input_type", "input_ref", "wcag_options", "violations_count", "created_at"):
+                assert projection.get(field) == 1
 
     def test_forgot_password_rate_limited(self):
         """Forgot-password endpoint is rate limited."""

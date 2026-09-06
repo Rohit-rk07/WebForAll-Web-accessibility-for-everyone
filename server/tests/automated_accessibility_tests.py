@@ -1,10 +1,28 @@
 """Automated accessibility testing system for the Accessibility Analyzer UI."""
 
+import os
+import socket
+from pathlib import Path
+
 import pytest
+import pytest_asyncio
 import asyncio
 from playwright.async_api import async_playwright, Page, Browser
 from typing import Dict, List, Any, Optional
 import json
+
+# Reuse the vendored axe-core (same as the analyzer) instead of a CDN so these
+# tests never depend on external network availability.
+AXE_CORE_PATH = str(Path(__file__).resolve().parent.parent / "analyzer" / "axe-core.min.js")
+
+
+def _frontend_running() -> bool:
+    """True only if the Vite dev server is up on localhost:5173."""
+    try:
+        with socket.create_connection(("localhost", 5173), timeout=1.0):
+            return True
+    except OSError:
+        return False
 
 class AutomatedAccessibilityTester:
     """
@@ -40,7 +58,7 @@ class AutomatedAccessibilityTester:
             Dict containing accessibility test results
         """
         # Inject axe-core
-        await page.add_script_tag(url="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js")
+        await page.add_script_tag(path=AXE_CORE_PATH)
         
         # Run axe-core analysis
         results = await page.evaluate(f"""
@@ -218,8 +236,8 @@ class AutomatedAccessibilityTester:
         """
         contrast_issues = []
         
-        # Use axe-core for color contrast testing
-        await page.add_script_tag(url="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js")
+        # Use the vendored axe-core for color contrast testing
+        await page.add_script_tag(path=AXE_CORE_PATH)
         
         contrast_results = await page.evaluate("""
             async () => {
@@ -363,9 +381,11 @@ class AutomatedAccessibilityTester:
 automated_tester = AutomatedAccessibilityTester()
 
 # Pytest fixtures
-@pytest.fixture
+@pytest_asyncio.fixture
 async def accessibility_page():
     """Fixture for creating a Playwright page for accessibility testing."""
+    if not _frontend_running():
+        pytest.skip("Frontend dev server not running on localhost:5173")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
